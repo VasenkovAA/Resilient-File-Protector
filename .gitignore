@@ -67,3 +67,41 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+
+
+# Build artifacts
+build/
+cmake-build-*/
+out/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# Qt
+*.user
+*.autosave
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.app
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

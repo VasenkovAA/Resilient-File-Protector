@@ -1,0 +1,93 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "displayName": "Developer build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RFP_BUILD_GUI": "ON",
+        "RFP_BUILD_CLI": "ON",
+        "RFP_BUILD_TESTS": "ON",
+        "RFP_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "ci",
+      "inherits": "base",
+      "displayName": "CI build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RFP_BUILD_GUI": "ON",
+        "RFP_BUILD_CLI": "ON",
+        "RFP_BUILD_TESTS": "ON",
+        "RFP_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "core-only",
+      "inherits": "base",
+      "displayName": "Core without Qt GUI",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RFP_BUILD_GUI": "OFF",
+        "RFP_BUILD_CLI": "ON",
+        "RFP_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
+    },
+    {
+      "name": "core-only",
+      "configurePreset": "core-only"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "core-only",
+      "configurePreset": "core-only",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

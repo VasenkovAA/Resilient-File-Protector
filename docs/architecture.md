@@ -1,0 +1,26 @@
+# Architecture
+
+R.F.P. is split into independent modules.
+
+```text
+Qt GUI  ───────┐
+CLI     ───────┼── rfp_stego ── rfp_core
+future API ────┘
+
+future encryption module: rfp_crypto
+```
+
+The steganography library does not depend on Qt. It operates on a raw `ImageBuffer` with width, height, channel count and bytes.
+Qt-specific image loading/saving is implemented only in `src/gui/QtImageAdapter.*`.
+
+## Why no image metadata?
+
+The first project stage does not write EXIF fields, PNG text chunks or custom visible format headers.
+Extraction depends on external parameters remembered by the user.
+
+## Current payload format
+
+At the current stage, the hidden payload is raw bytes only.
+There is no embedded magic value, no embedded size and no embedded CRC field.
+
+The GUI displays CRC32 after embedding and after extraction. The user can compare these values manually.

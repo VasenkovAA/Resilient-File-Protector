@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+
+    env:
+      QT_VERSION: 6.8.3
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - name: Install Linux tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build build-essential
+
+      - name: Install macOS tools
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja || true
+
+      - name: Install Windows tools
+        if: runner.os == 'Windows'
+        run: choco install ninja -y
+
+      - name: Bootstrap vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            "$VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+          else
+            "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      - name: Install GoogleTest through vcpkg
+        shell: bash
+        run: |
+          VCPKG_EXE="$VCPKG_ROOT/vcpkg"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            VCPKG_EXE="$VCPKG_ROOT/vcpkg.exe"
+          fi
+          "$VCPKG_EXE" install gtest
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake --preset ci -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset ci --parallel
+
+      - name: Test
+        shell: bash
+        run: ctest --preset ci
