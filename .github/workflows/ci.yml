@@ -17,7 +17,7 @@ jobs:
         os: [ubuntu-24.04, windows-2022, macos-14]
 
     env:
-      QT_VERSION: 6.8.3
+      QT_VERSION: '6.*'
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
     steps:
@@ -59,14 +59,14 @@ jobs:
             "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
           fi
 
-      - name: Install GoogleTest through vcpkg
+      - name: Install dependencies through vcpkg manifest
         shell: bash
         run: |
           VCPKG_EXE="$VCPKG_ROOT/vcpkg"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             VCPKG_EXE="$VCPKG_ROOT/vcpkg.exe"
           fi
-          "$VCPKG_EXE" install gtest
+          "$VCPKG_EXE" install --x-manifest-root="$GITHUB_WORKSPACE"
 
       - name: Configure
         shell: bash
