@@ -1,21 +1,16 @@
 {
-  "name": "RFP C++20 Qt 6.8",
+  "name": "RFP C++20 Qt 6 (system packages)",
   "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "QT_VERSION": "6.8.3"
-    }
+    "dockerfile": "Dockerfile"
   },
   "remoteUser": "vscode",
   "containerEnv": {
-    "CMAKE_PREFIX_PATH": "/opt/Qt/6.8.3/gcc_64"
+    "CMAKE_PREFIX_PATH": "/usr/lib/x86_64-linux-gnu/cmake/Qt6"
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-vscode.cpptools",
-        "ms-vscode.cmake-tools",
-        "twxs.cmake"
+
       ]
     }
   }

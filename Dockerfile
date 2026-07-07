@@ -2,7 +2,6 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Устанавливаем компиляторы, CMake, Ninja, Qt6 и GoogleTest
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -21,11 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtest-dev \
     git \
     ca-certificates \
-    sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Создаём пользователя vscode (как в оригинале)
-RUN useradd -m vscode && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode
-
-USER vscode
 WORKDIR /workspace
+
+COPY . /workspace/rfp/
+
+ENV CMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6
+
+CMD ["/bin/bash"]
