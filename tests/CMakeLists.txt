@@ -2,7 +2,10 @@ include(GoogleTest)
 
 add_executable(rfp-tests
     core/Crc32Tests.cpp
+    stego/StegoParamsTests.cpp
+    stego/StegoDispersionTests.cpp
     stego/StegoRoundTripTests.cpp
+    stego/StegoSmartSelectionTests.cpp
 )
 
 rfp_set_project_options(rfp-tests)

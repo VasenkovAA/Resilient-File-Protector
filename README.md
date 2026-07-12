@@ -14,30 +14,44 @@ The project is intentionally split into an independent core and a GUI applicatio
 
 ## Current stage
 
-Implemented project skeleton:
-
-- CMake-based C++20 build;
-- Qt 6 GUI target;
-- library targets separated from GUI;
-- GoogleTest integration through `find_package(GTest REQUIRED)`;
-- GitHub Actions CI for Linux, Windows and macOS;
-- DevContainer for a reproducible Linux development environment;
-- basic LSB steganography API for raw raster buffers;
-- first GUI prototype for embedding/extracting UTF-8 text in PNG-compatible images.
+- CMake-based C++20 build with presets.
+- Qt 6 GUI with full steganography controls.
+- Library targets separated from GUI.
+- GoogleTest integration.
+- GitHub Actions CI for Linux, Windows and macOS.
+- DevContainer for reproducible development.
+- **LSB steganography with two slot selection modes:**
+  - **Uniform** – sequential or shuffled (backward‑compatible).
+  - **Smart** – dispersion‑based filtering and sorting for better visual concealment.
+- GUI displays real‑time capacity and CRC32 integrity checks.
+- CLI self‑test supports all parameters.
 
 ## Important design decision
 
 The application does **not** write anything into image metadata such as EXIF, PNG text chunks or custom file headers.
 The image remains a normal raster image.
 
-For the first stage, extraction uses user-supplied parameters:
+Extraction requires the same parameters that were used during embedding.
+The GUI shows all parameters after embedding, so you can record them.
 
-- expected payload size in bytes;
-- number of least significant bits per channel;
-- channel selection;
-- optional seed.
+## Steganography parameters
 
-This avoids adding visible format metadata. Integrity can be checked by comparing CRC32 values shown by the application.
+### Basic (for both modes)
+
+- **Bits per channel** – number of LSBs to use (1–4).
+- **Seed** – random seed for shuffling; `0` means no shuffle.
+- **Channels** – select which colour channels (R, G, B, A) are used.
+- **Payload size** (for extraction) – number of bytes to read.
+
+### Smart mode specific
+
+- **Mode** – choose `Uniform` or `Smart`.
+- **Window size** – 3,5,7,9,11,13.
+- **Dispersion metric** – `Luminance`, `Per‑channel`, `Sum`.
+- **Threshold** – minimum dispersion value; slots below this are discarded.
+- **Apply shuffle after sorting** – if enabled, the sorted list is shuffled using the seed.
+
+The GUI provides an **Auto** button that suggests a threshold (70th percentile of all dispersions) for the loaded image.
 
 ## Requirements
 
@@ -98,6 +112,12 @@ The CLI target is also built:
 
 ```bash
 ./build/dev/src/cli/rfp-cli --help
+```
+
+CLI self‑test accepts all parameters, e.g.:
+
+```bash
+./build/dev/src/cli/rfp-cli self-test --mode smart --threshold 50 --window 5 --metric luminance --shuffle on
 ```
 
 ## Installing dependencies
@@ -187,13 +207,14 @@ ctest --preset dev
 
 ## Roadmap
 
-### Stage 1 — Image steganography
+### Stage 1 — Image steganography (completed)
 
 - PNG-oriented raster steganography;
 - text payload support;
 - extraction by user-supplied parameters;
-- integrity check;
-- GUI workflow.
+- integrity check via CRC32;
+- GUI workflow;
+- **smart slot selection based on local dispersion**.
 
 ### Stage 2 — Source-code-like masking
 
