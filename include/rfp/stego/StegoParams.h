@@ -21,6 +21,18 @@ struct StegoParams {
   DispersionMetric metric = DispersionMetric::Luminance;
   double dispersionThreshold = 0.0;
   bool applyShuffleAfterSort = true;
+
+  bool operator==(const StegoParams &other) const {
+    return bitsPerChannel == other.bitsPerChannel && seed == other.seed &&
+           useRedChannel == other.useRedChannel &&
+           useGreenChannel == other.useGreenChannel &&
+           useBlueChannel == other.useBlueChannel &&
+           useAlphaChannel == other.useAlphaChannel && mode == other.mode &&
+           windowSize == other.windowSize && metric == other.metric &&
+           dispersionThreshold == other.dispersionThreshold &&
+           applyShuffleAfterSort == other.applyShuffleAfterSort;
+  }
+  bool operator!=(const StegoParams &other) const { return !(*this == other); }
 };
 
 } // namespace rfp::stego

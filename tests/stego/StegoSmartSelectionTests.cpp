@@ -51,7 +51,7 @@ TEST(SmartSelectionTests, RoundTripWithSmartSelection) {
   params.metric = rfp::stego::DispersionMetric::Luminance;
   params.windowSize = 3;
   params.bitsPerChannel = 1;
-  params.dispersionThreshold = 0.0; // <-- изменено с 50.0 на 0.0
+  params.dispersionThreshold = 0.0;
   params.seed = 123;
   params.applyShuffleAfterSort = true;
 

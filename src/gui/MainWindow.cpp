@@ -1,5 +1,4 @@
 #include "MainWindow.h"
-
 #include "QtImageAdapter.h"
 #include "rfp/core/ByteBuffer.h"
 #include "rfp/core/Crc32.h"
@@ -7,18 +6,30 @@
 #include "rfp/stego/StegoDecoder.h"
 #include "rfp/stego/StegoDispersion.h"
 #include "rfp/stego/StegoEncoder.h"
+#include "rfp/stego/StegoSlots.h"
 
+#include <QDialog>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QGraphicsPixmapItem>
+#include <QGraphicsRectItem>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QMessageBox>
+#include <QPainter>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QResizeEvent>
+#include <QSlider>
+#include <QSplitter>
+#include <QStatusBar>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <span>
 #include <vector>
 
@@ -28,8 +39,6 @@ QString crcToText(std::uint32_t crc) {
   return QStringLiteral("%1").arg(crc, 8, 16, QLatin1Char('0')).toUpper();
 }
 
-// Вычисляет автоматический порог как 70-й процентиль всех дисперсий по всем
-// пикселям и каналам
 double computeAutoThreshold(const rfp::stego::ImageBuffer &image,
                             const rfp::stego::StegoParams &params) {
   if (!image.isValid())
@@ -56,13 +65,98 @@ double computeAutoThreshold(const rfp::stego::ImageBuffer &image,
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   setWindowTitle(QStringLiteral("R.F.P. - Resilient File Protector"));
-  resize(900, 700);
+  resize(1200, 700);
+  setupUi();
 
+  connect(bitsPerChannelSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+          this, &MainWindow::updatePreview);
+  connect(seedSpin_, QOverload<int>::of(&QSpinBox::valueChanged), this,
+          &MainWindow::updatePreview);
+  connect(redCheck_, &QCheckBox::toggled, this, &MainWindow::updatePreview);
+  connect(greenCheck_, &QCheckBox::toggled, this, &MainWindow::updatePreview);
+  connect(blueCheck_, &QCheckBox::toggled, this, &MainWindow::updatePreview);
+  connect(alphaCheck_, &QCheckBox::toggled, this, &MainWindow::updatePreview);
+  connect(modeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+          &MainWindow::updatePreview);
+  connect(windowSizeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, &MainWindow::updatePreview);
+  connect(metricCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, &MainWindow::updatePreview);
+  connect(thresholdEdit_, &QLineEdit::textChanged, this,
+          &MainWindow::updatePreview);
+  connect(shuffleAfterSortCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updatePreview);
+  connect(showPreviewCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updatePreview);
+  connect(previewModeCombo_,
+          QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+          &MainWindow::updatePreview);
+  connect(overlayOpacitySlider_, &QSlider::valueChanged, this,
+          &MainWindow::updatePreview);
+  connect(highlightChangesCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updatePreview);
+
+  connect(bitsPerChannelSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
+          this, &MainWindow::updateCapacityInfo);
+  connect(seedSpin_, QOverload<int>::of(&QSpinBox::valueChanged), this,
+          &MainWindow::updateCapacityInfo);
+  connect(redCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updateCapacityInfo);
+  connect(greenCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updateCapacityInfo);
+  connect(blueCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updateCapacityInfo);
+  connect(alphaCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updateCapacityInfo);
+  connect(modeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+          &MainWindow::updateCapacityInfo);
+  connect(windowSizeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, &MainWindow::updateCapacityInfo);
+  connect(metricCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, &MainWindow::updateCapacityInfo);
+  connect(thresholdEdit_, &QLineEdit::textChanged, this,
+          &MainWindow::updateCapacityInfo);
+  connect(shuffleAfterSortCheck_, &QCheckBox::toggled, this,
+          &MainWindow::updateCapacityInfo);
+
+  connect(autoThresholdButton_, &QPushButton::clicked, this, [this]() {
+    if (!currentImage_.has_value()) {
+      QMessageBox::warning(this, QStringLiteral("R.F.P."),
+                           QStringLiteral("Load an input image first."));
+      return;
+    }
+    auto params = collectParams();
+    const double autoThr = computeAutoThreshold(currentImage_.value(), params);
+    thresholdEdit_->setText(QString::number(autoThr, 'f', 2));
+  });
+
+  connect(fullscreenButton_, &QPushButton::clicked, this,
+          &MainWindow::onFullscreen);
+  connect(payloadEdit_, &QPlainTextEdit::textChanged, this,
+          &MainWindow::onTextChanged);
+
+  updateCapacityInfo();
+  updateUsageInfo();
+  updateStats(QStringLiteral("Ready"));
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event) {
+  QMainWindow::resizeEvent(event);
+  if (previewScene_ && previewScene_->itemsBoundingRect().isValid()) {
+    previewView_->fitInView(previewScene_->itemsBoundingRect(),
+                            Qt::KeepAspectRatio);
+  }
+  updateMiniPreview();
+}
+
+void MainWindow::setupUi() {
   auto *central = new QWidget(this);
-  auto *rootLayout = new QVBoxLayout(central);
+  auto *mainLayout = new QHBoxLayout(central);
 
-  // --- Группа "Images" ---
-  auto *filesGroup = new QGroupBox(QStringLiteral("Images"), central);
+  auto *leftPanel = new QWidget(central);
+  auto *leftLayout = new QVBoxLayout(leftPanel);
+
+  auto *filesGroup = new QGroupBox(QStringLiteral("Images"), leftPanel);
   auto *filesLayout = new QGridLayout(filesGroup);
 
   inputImageEdit_ = new QLineEdit(filesGroup);
@@ -72,6 +166,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   auto *browseOutputButton =
       new QPushButton(QStringLiteral("Browse..."), filesGroup);
 
+  miniPreviewLabel_ = new QLabel(filesGroup);
+  miniPreviewLabel_->setFixedHeight(120);
+  miniPreviewLabel_->setScaledContents(false);
+  miniPreviewLabel_->setAlignment(Qt::AlignCenter);
+  miniPreviewLabel_->setStyleSheet(
+      "QLabel { background-color: #333; border: 1px solid #555; }");
+  miniPreviewLabel_->setText(QStringLiteral("No image"));
+
   filesLayout->addWidget(new QLabel(QStringLiteral("Input image:"), filesGroup),
                          0, 0);
   filesLayout->addWidget(inputImageEdit_, 0, 1);
@@ -80,18 +182,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
       new QLabel(QStringLiteral("Output image:"), filesGroup), 1, 0);
   filesLayout->addWidget(outputImageEdit_, 1, 1);
   filesLayout->addWidget(browseOutputButton, 1, 2);
+  filesLayout->addWidget(miniPreviewLabel_, 0, 3, 2, 1);
 
   connect(browseInputButton, &QPushButton::clicked, this,
           &MainWindow::browseInputImage);
   connect(browseOutputButton, &QPushButton::clicked, this,
           &MainWindow::browseOutputImage);
 
-  // --- Группа "Steganography parameters" ---
   auto *paramsGroup =
-      new QGroupBox(QStringLiteral("Steganography parameters"), central);
+      new QGroupBox(QStringLiteral("Steganography parameters"), leftPanel);
   auto *paramsLayout = new QFormLayout(paramsGroup);
 
-  // Основные параметры
   bitsPerChannelSpin_ = new QSpinBox(paramsGroup);
   bitsPerChannelSpin_->setRange(1, 4);
   bitsPerChannelSpin_->setValue(1);
@@ -130,7 +231,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
                        payloadSizeSpin_);
   paramsLayout->addRow(QStringLiteral("Channels:"), channelsWidget);
 
-  // Новые параметры умного выбора
   auto *smartGroup =
       new QGroupBox(QStringLiteral("Smart selection"), paramsGroup);
   auto *smartLayout = new QFormLayout(smartGroup);
@@ -182,77 +282,123 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
   paramsLayout->addRow(smartGroup);
 
-  // --- Группа ёмкости ---
-  capacityLabel_ = new QLabel(QStringLiteral("Capacity: not loaded"), central);
+  capacityLabel_ =
+      new QLabel(QStringLiteral("Capacity: not loaded"), leftPanel);
 
-  // --- Группа "Text payload" ---
-  auto *payloadGroup = new QGroupBox(QStringLiteral("Text payload"), central);
+  auto *payloadGroup = new QGroupBox(QStringLiteral("Text payload"), leftPanel);
   auto *payloadLayout = new QVBoxLayout(payloadGroup);
   payloadEdit_ = new QPlainTextEdit(payloadGroup);
   payloadEdit_->setPlaceholderText(
       QStringLiteral("Text to hide or extracted text will appear here"));
   payloadLayout->addWidget(payloadEdit_);
+  usageLabel_ =
+      new QLabel(QStringLiteral("Usage: 0 / 0 bytes (0%)"), payloadGroup);
+  payloadLayout->addWidget(usageLabel_);
   payloadLayout->addWidget(capacityLabel_);
 
-  // --- Кнопки действий ---
   auto *actionsLayout = new QHBoxLayout;
-  auto *embedButton = new QPushButton(QStringLiteral("Embed text"), central);
+  auto *embedButton = new QPushButton(QStringLiteral("Embed text"), leftPanel);
   auto *extractButton =
-      new QPushButton(QStringLiteral("Extract text"), central);
+      new QPushButton(QStringLiteral("Extract text"), leftPanel);
   actionsLayout->addWidget(embedButton);
   actionsLayout->addWidget(extractButton);
   actionsLayout->addStretch();
 
-  statusLabel_ = new QLabel(QStringLiteral("Ready"), central);
-  statusLabel_->setWordWrap(true);
+  auto *previewControlsGroup =
+      new QGroupBox(QStringLiteral("Preview controls"), leftPanel);
+  auto *previewControlsLayout = new QFormLayout(previewControlsGroup);
+  showPreviewCheck_ =
+      new QCheckBox(QStringLiteral("Show preview"), previewControlsGroup);
+  showPreviewCheck_->setChecked(true);
 
-  rootLayout->addWidget(filesGroup);
-  rootLayout->addWidget(paramsGroup);
-  rootLayout->addWidget(payloadGroup, 1);
-  rootLayout->addLayout(actionsLayout);
-  rootLayout->addWidget(statusLabel_);
+  previewModeCombo_ = new QComboBox(previewControlsGroup);
+  previewModeCombo_->addItem(QStringLiteral("Original"));
+  previewModeCombo_->addItem(QStringLiteral("Dispersion overlay"));
+  previewModeCombo_->addItem(QStringLiteral("Comparison (after embed)"));
+  previewModeCombo_->setCurrentIndex(0);
 
+  overlayOpacitySlider_ = new QSlider(Qt::Horizontal, previewControlsGroup);
+  overlayOpacitySlider_->setRange(0, 100);
+  overlayOpacitySlider_->setValue(50);
+
+  highlightChangesCheck_ = new QCheckBox(
+      QStringLiteral("Highlight changed pixels"), previewControlsGroup);
+  highlightChangesCheck_->setChecked(false);
+
+  previewControlsLayout->addRow(showPreviewCheck_);
+  previewControlsLayout->addRow(QStringLiteral("Mode:"), previewModeCombo_);
+  previewControlsLayout->addRow(QStringLiteral("Opacity:"),
+                                overlayOpacitySlider_);
+  previewControlsLayout->addRow(highlightChangesCheck_);
+
+  statsLabel_ = new QLabel(previewControlsGroup);
+  statsLabel_->setWordWrap(true);
+  previewControlsLayout->addRow(QStringLiteral("Stats:"), statsLabel_);
+
+  leftLayout->addWidget(filesGroup);
+  leftLayout->addWidget(paramsGroup);
+  leftLayout->addWidget(payloadGroup, 1);
+  leftLayout->addLayout(actionsLayout);
+  leftLayout->addWidget(previewControlsGroup);
+
+  auto *rightPanel = new QWidget(central);
+  auto *rightLayout = new QVBoxLayout(rightPanel);
+
+  auto *previewHeader = new QWidget(rightPanel);
+  auto *headerLayout = new QHBoxLayout(previewHeader);
+  headerLayout->setContentsMargins(0, 0, 0, 0);
+  QLabel *previewTitle = new QLabel(QStringLiteral("Preview"), previewHeader);
+  fullscreenButton_ =
+      new QPushButton(QStringLiteral("Fullscreen"), previewHeader);
+  headerLayout->addWidget(previewTitle);
+  headerLayout->addStretch();
+  headerLayout->addWidget(fullscreenButton_);
+
+  previewView_ = new QGraphicsView(rightPanel);
+  previewScene_ = new QGraphicsScene(this);
+  previewView_->setScene(previewScene_);
+  previewView_->setRenderHint(QPainter::Antialiasing);
+  previewView_->setBackgroundBrush(Qt::darkGray);
+  previewView_->setAlignment(Qt::AlignCenter);
+  previewView_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+  rightLayout->addWidget(previewHeader);
+  rightLayout->addWidget(previewView_, 1);
+
+  auto *splitter = new QSplitter(Qt::Horizontal, central);
+  splitter->addWidget(leftPanel);
+  splitter->addWidget(rightPanel);
+  splitter->setStretchFactor(0, 1);
+  splitter->setStretchFactor(1, 2);
+
+  mainLayout->addWidget(splitter);
   setCentralWidget(central);
 
-  // Сигналы для обновления ёмкости
-  connect(bitsPerChannelSpin_, QOverload<int>::of(&QSpinBox::valueChanged),
-          this, &MainWindow::updateCapacityInfo);
-  connect(seedSpin_, QOverload<int>::of(&QSpinBox::valueChanged), this,
-          &MainWindow::updateCapacityInfo);
-  connect(redCheck_, &QCheckBox::toggled, this,
-          &MainWindow::updateCapacityInfo);
-  connect(greenCheck_, &QCheckBox::toggled, this,
-          &MainWindow::updateCapacityInfo);
-  connect(blueCheck_, &QCheckBox::toggled, this,
-          &MainWindow::updateCapacityInfo);
-  connect(alphaCheck_, &QCheckBox::toggled, this,
-          &MainWindow::updateCapacityInfo);
-  connect(modeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-          &MainWindow::updateCapacityInfo);
-  connect(windowSizeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, &MainWindow::updateCapacityInfo);
-  connect(metricCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, &MainWindow::updateCapacityInfo);
-  connect(thresholdEdit_, &QLineEdit::textChanged, this,
-          &MainWindow::updateCapacityInfo);
-  connect(shuffleAfterSortCheck_, &QCheckBox::toggled, this,
-          &MainWindow::updateCapacityInfo);
-
-  connect(autoThresholdButton_, &QPushButton::clicked, this, [this]() {
-    if (!currentImage_.has_value()) {
-      QMessageBox::warning(this, QStringLiteral("R.F.P."),
-                           QStringLiteral("Load an input image first."));
-      return;
-    }
-    auto params = collectParams();
-    const double autoThr = computeAutoThreshold(currentImage_.value(), params);
-    thresholdEdit_->setText(QString::number(autoThr, 'f', 2));
-  });
+  statusLabel_ = new QLabel(QStringLiteral("Ready"), this);
+  progressBar_ = new QProgressBar(this);
+  progressBar_->setVisible(false);
+  progressBar_->setRange(0, 100);
+  statusBar()->addWidget(statusLabel_, 1);
+  statusBar()->addWidget(progressBar_);
 
   connect(embedButton, &QPushButton::clicked, this, &MainWindow::embedText);
   connect(extractButton, &QPushButton::clicked, this, &MainWindow::extractText);
+}
 
-  updateCapacityInfo();
+void MainWindow::setProgress(int value, int maximum) {
+  if (maximum <= 0) {
+    progressBar_->setVisible(false);
+    return;
+  }
+  progressBar_->setVisible(true);
+  progressBar_->setRange(0, maximum);
+  progressBar_->setValue(value);
+}
+
+void MainWindow::setStatus(const QString &text) { statusLabel_->setText(text); }
+
+void MainWindow::updateStats(const QString &text) {
+  statsLabel_->setText(text);
 }
 
 void MainWindow::browseInputImage() {
@@ -262,15 +408,31 @@ void MainWindow::browseInputImage() {
 
   if (!path.isEmpty()) {
     inputImageEdit_->setText(path);
+    setProgress(0, 0);
+    setStatus(QStringLiteral("Loading image..."));
     auto result = rfp::gui::loadImageBuffer(path);
     if (result) {
       currentImage_ = result.value();
+      modifiedImage_.reset();
+      updateMiniPreview();
+      showImage(previewScene_, imageBufferToQImage(currentImage_.value()));
+      setStatus(QStringLiteral("Loaded: %1").arg(path));
+      updateStats(QStringLiteral("Resolution: %1×%2, Channels: %3")
+                      .arg(currentImage_->width)
+                      .arg(currentImage_->height)
+                      .arg(currentImage_->channels));
     } else {
       currentImage_.reset();
+      modifiedImage_.reset();
+      miniPreviewLabel_->setText(QStringLiteral("No image"));
+      previewScene_->clear();
       QMessageBox::warning(this, QStringLiteral("R.F.P."),
                            QString::fromStdString(result.error().message));
+      setStatus(QStringLiteral("Error loading image"));
     }
     updateCapacityInfo();
+    updateUsageInfo();
+    updatePreview();
   }
 }
 
@@ -284,28 +446,322 @@ void MainWindow::browseOutputImage() {
   }
 }
 
-rfp::stego::StegoParams MainWindow::collectParams() const {
-  rfp::stego::StegoParams params;
-  params.bitsPerChannel =
-      static_cast<std::uint8_t>(bitsPerChannelSpin_->value());
-  params.seed = static_cast<std::uint32_t>(seedSpin_->value());
-  params.useRedChannel = redCheck_->isChecked();
-  params.useGreenChannel = greenCheck_->isChecked();
-  params.useBlueChannel = blueCheck_->isChecked();
-  params.useAlphaChannel = alphaCheck_->isChecked();
-
-  params.mode = static_cast<rfp::stego::SlotSelectionMode>(
-      modeCombo_->currentData().toInt());
-  params.windowSize = windowSizeCombo_->currentData().toInt();
-  params.metric = static_cast<rfp::stego::DispersionMetric>(
-      metricCombo_->currentData().toInt());
-  params.dispersionThreshold = thresholdEdit_->text().toDouble();
-  params.applyShuffleAfterSort = shuffleAfterSortCheck_->isChecked();
-
-  return params;
+QImage
+MainWindow::imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const {
+  if (!buffer.isValid())
+    return QImage();
+  const QImage::Format fmt =
+      (buffer.channels == 4) ? QImage::Format_RGBA8888 : QImage::Format_RGB888;
+  QImage img(static_cast<int>(buffer.width), static_cast<int>(buffer.height),
+             fmt);
+  const auto rowBytes =
+      static_cast<std::size_t>(buffer.width) * buffer.channels;
+  for (int y = 0; y < img.height(); ++y) {
+    const auto *src =
+        buffer.pixels.data() + static_cast<std::size_t>(y) * rowBytes;
+    auto *dst = img.scanLine(y);
+    std::memcpy(dst, src, rowBytes);
+  }
+  return img;
 }
 
-void MainWindow::setStatus(const QString &text) { statusLabel_->setText(text); }
+void MainWindow::showImage(QGraphicsScene *scene, const QImage &image) {
+  if (!scene)
+    return;
+  scene->clear();
+  if (image.isNull())
+    return;
+  QPixmap pix = QPixmap::fromImage(image);
+  scene->addPixmap(pix);
+  if (previewView_) {
+    previewView_->fitInView(scene->itemsBoundingRect(), Qt::KeepAspectRatio);
+  }
+}
+
+void MainWindow::updateMiniPreview() {
+  if (!currentImage_.has_value()) {
+    miniPreviewLabel_->setPixmap(QPixmap());
+    miniPreviewLabel_->setText(QStringLiteral("No image"));
+    return;
+  }
+  QImage img = imageBufferToQImage(currentImage_.value());
+  if (img.isNull()) {
+    miniPreviewLabel_->setText(QStringLiteral("Invalid image"));
+    return;
+  }
+  QPixmap pix = QPixmap::fromImage(img);
+  int labelHeight = miniPreviewLabel_->height();
+  if (labelHeight <= 0)
+    labelHeight = 120;
+  QPixmap scaled = pix.scaledToHeight(labelHeight, Qt::SmoothTransformation);
+  miniPreviewLabel_->setPixmap(scaled);
+  miniPreviewLabel_->setText(QString());
+}
+
+void MainWindow::updateUsageInfo() {
+  if (!currentImage_.has_value()) {
+    usageLabel_->setText(QStringLiteral("Usage: no image"));
+    return;
+  }
+  const auto params = collectParams();
+  const auto capacity =
+      rfp::stego::capacityBytes(currentImage_.value(), params);
+  const QString text = payloadEdit_->toPlainText();
+  const QByteArray utf8 = text.toUtf8();
+  const std::size_t used = static_cast<std::size_t>(utf8.size());
+  if (capacity == 0) {
+    usageLabel_->setText(QStringLiteral("Usage: 0 bytes (capacity 0)"));
+    return;
+  }
+  double percent = (static_cast<double>(used) / capacity) * 100.0;
+  QString color = (used <= capacity) ? "green" : "red";
+  usageLabel_->setText(
+      QStringLiteral(
+          "Usage: <span style=\"color:%1;\">%2 / %3 bytes (%4%)</span>")
+          .arg(color)
+          .arg(used)
+          .arg(capacity)
+          .arg(percent, 0, 'f', 1));
+}
+
+void MainWindow::onTextChanged() { updateUsageInfo(); }
+
+QColor MainWindow::dispersionToColor(double value, double minVal,
+                                     double maxVal) const {
+  double norm = (maxVal > minVal) ? (value - minVal) / (maxVal - minVal) : 0.5;
+  norm = std::clamp(norm, 0.0, 1.0);
+  int r, g, b;
+  if (norm < 0.5) {
+    double t = norm / 0.5;
+    r = 0;
+    g = static_cast<int>(255 * t);
+    b = static_cast<int>(255 * (1.0 - t));
+  } else {
+    double t = (norm - 0.5) / 0.5;
+    r = static_cast<int>(255 * t);
+    g = static_cast<int>(255 * (1.0 - t));
+    b = 0;
+  }
+  return QColor(r, g, b);
+}
+
+QImage
+MainWindow::generateDispersionOverlay(const rfp::stego::ImageBuffer &buffer,
+                                      const rfp::stego::StegoParams &params,
+                                      double &outMin, double &outMax,
+                                      double &outMean) {
+  QImage overlay(static_cast<int>(buffer.width),
+                 static_cast<int>(buffer.height), QImage::Format_ARGB32);
+  overlay.fill(Qt::transparent);
+
+  if (!buffer.isValid() ||
+      params.mode != rfp::stego::SlotSelectionMode::Smart) {
+    return overlay;
+  }
+
+  if (!dispersionCacheValid_ || cachedParams_ != params) {
+    setProgress(0, 100);
+    setStatus(QStringLiteral("Computing dispersion..."));
+    rfp::stego::DispersionCalculator calc(buffer, params);
+    const auto pixelCount = static_cast<std::size_t>(buffer.width) *
+                            static_cast<std::size_t>(buffer.height);
+    std::vector<double> disp;
+    disp.reserve(pixelCount);
+    double sum = 0.0;
+    double minVal = std::numeric_limits<double>::max();
+    double maxVal = -std::numeric_limits<double>::max();
+
+    for (std::size_t pixel = 0; pixel < pixelCount; ++pixel) {
+      double totalDisp = 0.0;
+      int channelCount = 0;
+      for (std::uint8_t ch = 0; ch < buffer.channels; ++ch) {
+        if (rfp::stego::detail::channelEnabled(ch, params)) {
+          totalDisp += calc.getDispersion(pixel, ch);
+          ++channelCount;
+        }
+      }
+      double pixelDisp = (channelCount > 0) ? (totalDisp / channelCount) : 0.0;
+      disp.push_back(pixelDisp);
+      sum += pixelDisp;
+      if (pixelDisp < minVal)
+        minVal = pixelDisp;
+      if (pixelDisp > maxVal)
+        maxVal = pixelDisp;
+      if (pixel % (pixelCount / 100 + 1) == 0) {
+        setProgress(static_cast<int>(pixel * 100 / pixelCount), 100);
+      }
+    }
+
+    cachedDispersions_ = std::move(disp);
+    cachedParams_ = params;
+    dispersionCacheValid_ = true;
+    outMin = minVal;
+    outMax = maxVal;
+    outMean = sum / static_cast<double>(pixelCount);
+    setProgress(0, 0);
+    setStatus(QStringLiteral("Dispersion computed"));
+  } else {
+    const auto &disp = cachedDispersions_.value();
+    outMin = *std::min_element(disp.begin(), disp.end());
+    outMax = *std::max_element(disp.begin(), disp.end());
+    outMean = std::accumulate(disp.begin(), disp.end(), 0.0) /
+              static_cast<double>(disp.size());
+  }
+
+  const auto &disp = cachedDispersions_.value();
+  const int width = overlay.width();
+  const int height = overlay.height();
+  const int alpha = static_cast<int>(overlayOpacitySlider_->value() * 2.55);
+
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      const std::size_t idx =
+          static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
+          static_cast<std::size_t>(x);
+      double val = disp[idx];
+      QColor color = dispersionToColor(val, outMin, outMax);
+      color.setAlpha(alpha);
+      overlay.setPixelColor(x, y, color);
+    }
+  }
+
+  return overlay;
+}
+
+QImage MainWindow::generateChangesMask(const QImage &original,
+                                       const QImage &modified) const {
+  if (original.size() != modified.size()) {
+    return QImage();
+  }
+  QImage mask(original.size(), QImage::Format_ARGB32);
+  mask.fill(Qt::transparent);
+
+  QColor highlightColor(255, 0, 0, 128);
+  for (int y = 0; y < original.height(); ++y) {
+    for (int x = 0; x < original.width(); ++x) {
+      if (original.pixel(x, y) != modified.pixel(x, y)) {
+        mask.setPixelColor(x, y, highlightColor);
+      }
+    }
+  }
+  return mask;
+}
+
+QImage MainWindow::generateComparisonView(const QImage &original,
+                                          const QImage &modified,
+                                          bool highlightChanges) const {
+  if (original.isNull() || modified.isNull()) {
+    return QImage();
+  }
+
+  const int width = original.width() + modified.width() + 10;
+  const int height = std::max(original.height(), modified.height());
+  QImage combined(width, height, QImage::Format_RGB888);
+  combined.fill(Qt::lightGray);
+
+  QPainter painter(&combined);
+  painter.drawImage(0, 0, original);
+  painter.drawImage(original.width() + 10, 0, modified);
+
+  if (highlightChanges) {
+    QImage mask = generateChangesMask(original, modified);
+    if (!mask.isNull()) {
+      painter.drawImage(original.width() + 10, 0, mask);
+    }
+  }
+  painter.end();
+  return combined;
+}
+
+void MainWindow::updatePreview() {
+  if (!currentImage_.has_value()) {
+    previewScene_->clear();
+    return;
+  }
+
+  if (!showPreviewCheck_->isChecked()) {
+    showImage(previewScene_, imageBufferToQImage(currentImage_.value()));
+    updateStats(QStringLiteral("Resolution: %1×%2, Channels: %3")
+                    .arg(currentImage_->width)
+                    .arg(currentImage_->height)
+                    .arg(currentImage_->channels));
+    return;
+  }
+
+  const int mode = previewModeCombo_->currentIndex();
+  QImage displayImage;
+
+  switch (mode) {
+  case 0:
+    displayImage = imageBufferToQImage(currentImage_.value());
+    updateStats(QStringLiteral("Resolution: %1×%2, Channels: %3")
+                    .arg(currentImage_->width)
+                    .arg(currentImage_->height)
+                    .arg(currentImage_->channels));
+    break;
+  case 1: {
+    auto params = collectParams();
+    if (params.mode == rfp::stego::SlotSelectionMode::Smart) {
+      double minVal, maxVal, meanVal;
+      QImage overlay = generateDispersionOverlay(currentImage_.value(), params,
+                                                 minVal, maxVal, meanVal);
+      QImage base = imageBufferToQImage(currentImage_.value());
+      if (!overlay.isNull() && !base.isNull()) {
+        QPainter painter(&base);
+        painter.drawImage(0, 0, overlay);
+        painter.end();
+      }
+      displayImage = base;
+      updateStats(QStringLiteral("Dispersion: min=%1, max=%2, mean=%3")
+                      .arg(minVal, 0, 'f', 2)
+                      .arg(maxVal, 0, 'f', 2)
+                      .arg(meanVal, 0, 'f', 2));
+    } else {
+      displayImage = imageBufferToQImage(currentImage_.value());
+      updateStats(
+          QStringLiteral("Dispersion overlay available only in Smart mode"));
+    }
+  } break;
+  case 2: {
+    if (!modifiedImage_.has_value()) {
+      displayImage = imageBufferToQImage(currentImage_.value());
+      updateStats(
+          QStringLiteral("No modified image available. Embed data first."));
+      break;
+    }
+    QImage orig = imageBufferToQImage(currentImage_.value());
+    QImage mod = imageBufferToQImage(modifiedImage_.value());
+    const bool highlight = highlightChangesCheck_->isChecked();
+    displayImage = generateComparisonView(orig, mod, highlight);
+
+    if (orig.size() == mod.size()) {
+      int changedPixels = 0;
+      for (int y = 0; y < orig.height(); ++y) {
+        for (int x = 0; x < orig.width(); ++x) {
+          if (orig.pixel(x, y) != mod.pixel(x, y)) {
+            ++changedPixels;
+          }
+        }
+      }
+      const int totalPixels = orig.width() * orig.height();
+      const double percent =
+          (static_cast<double>(changedPixels) / totalPixels) * 100.0;
+      updateStats(QStringLiteral("Changed pixels: %1 / %2 (%3%)")
+                      .arg(changedPixels)
+                      .arg(totalPixels)
+                      .arg(percent, 0, 'f', 2));
+    } else {
+      updateStats(
+          QStringLiteral("Images have different sizes, cannot compare"));
+    }
+  } break;
+  default:
+    displayImage = imageBufferToQImage(currentImage_.value());
+    break;
+  }
+
+  showImage(previewScene_, displayImage);
+}
 
 void MainWindow::updateCapacityInfo() {
   if (!currentImage_.has_value()) {
@@ -335,6 +791,27 @@ void MainWindow::updateCapacityInfo() {
   capacityLabel_->setText(info);
 }
 
+rfp::stego::StegoParams MainWindow::collectParams() const {
+  rfp::stego::StegoParams params;
+  params.bitsPerChannel =
+      static_cast<std::uint8_t>(bitsPerChannelSpin_->value());
+  params.seed = static_cast<std::uint32_t>(seedSpin_->value());
+  params.useRedChannel = redCheck_->isChecked();
+  params.useGreenChannel = greenCheck_->isChecked();
+  params.useBlueChannel = blueCheck_->isChecked();
+  params.useAlphaChannel = alphaCheck_->isChecked();
+
+  params.mode = static_cast<rfp::stego::SlotSelectionMode>(
+      modeCombo_->currentData().toInt());
+  params.windowSize = windowSizeCombo_->currentData().toInt();
+  params.metric = static_cast<rfp::stego::DispersionMetric>(
+      metricCombo_->currentData().toInt());
+  params.dispersionThreshold = thresholdEdit_->text().toDouble();
+  params.applyShuffleAfterSort = shuffleAfterSortCheck_->isChecked();
+
+  return params;
+}
+
 void MainWindow::embedText() {
   if (inputImageEdit_->text().isEmpty() || outputImageEdit_->text().isEmpty()) {
     QMessageBox::warning(
@@ -351,10 +828,14 @@ void MainWindow::embedText() {
     return;
   }
 
+  setProgress(0, 0);
+  setStatus(QStringLiteral("Embedding..."));
+
   auto imageResult = rfp::gui::loadImageBuffer(inputImageEdit_->text());
   if (!imageResult) {
     QMessageBox::warning(this, QStringLiteral("R.F.P."),
                          QString::fromStdString(imageResult.error().message));
+    setStatus(QStringLiteral("Embedding failed"));
     return;
   }
   currentImage_ = imageResult.value();
@@ -368,6 +849,7 @@ void MainWindow::embedText() {
             "Payload is too large. Capacity: %1 bytes, payload: %2 bytes.")
             .arg(capacity)
             .arg(utf8.size()));
+    setStatus(QStringLiteral("Embedding failed: payload too large"));
     return;
   }
 
@@ -377,14 +859,18 @@ void MainWindow::embedText() {
   if (!encodedResult) {
     QMessageBox::warning(this, QStringLiteral("R.F.P."),
                          QString::fromStdString(encodedResult.error().message));
+    setStatus(QStringLiteral("Embedding failed"));
     return;
   }
+
+  modifiedImage_ = encodedResult.value();
 
   auto saveResult = rfp::gui::saveImageBuffer(encodedResult.value(),
                                               outputImageEdit_->text());
   if (!saveResult) {
     QMessageBox::warning(this, QStringLiteral("R.F.P."),
                          QString::fromStdString(saveResult.error().message));
+    setStatus(QStringLiteral("Save failed"));
     return;
   }
 
@@ -397,6 +883,14 @@ void MainWindow::embedText() {
 
   const auto crc = rfp::core::crc32(
       std::span<const rfp::core::Byte>(payload.data(), payload.size()));
+
+  const auto totalCapacity =
+      rfp::stego::capacityBytes(currentImage_.value(), params);
+  const double percentUsed =
+      (static_cast<double>(payloadSize) / totalCapacity) * 100.0;
+  updateStats(QStringLiteral("Used: %1 bytes (%2%)")
+                  .arg(payloadSize)
+                  .arg(percentUsed, 0, 'f', 1));
 
   QString paramsStr = QStringLiteral("Mode: %1, Bits: %2, Seed: %3, Channels: ")
                           .arg(modeCombo_->currentText())
@@ -428,6 +922,10 @@ void MainWindow::embedText() {
                 .arg(utf8.size())
                 .arg(crcToText(crc))
                 .arg(paramsStr));
+
+  updatePreview();
+  updateUsageInfo();
+  setProgress(0, 0);
 }
 
 void MainWindow::extractText() {
@@ -437,10 +935,12 @@ void MainWindow::extractText() {
     return;
   }
 
+  setStatus(QStringLiteral("Extracting..."));
   auto imageResult = rfp::gui::loadImageBuffer(inputImageEdit_->text());
   if (!imageResult) {
     QMessageBox::warning(this, QStringLiteral("R.F.P."),
                          QString::fromStdString(imageResult.error().message));
+    setStatus(QStringLiteral("Extraction failed"));
     return;
   }
   currentImage_ = imageResult.value();
@@ -452,6 +952,7 @@ void MainWindow::extractText() {
   if (!decodedResult) {
     QMessageBox::warning(this, QStringLiteral("R.F.P."),
                          QString::fromStdString(decodedResult.error().message));
+    setStatus(QStringLiteral("Extraction failed"));
     return;
   }
 
@@ -466,4 +967,42 @@ void MainWindow::extractText() {
   setStatus(QStringLiteral("Extracted %1 bytes. CRC32: %2.")
                 .arg(payloadSize)
                 .arg(crcToText(crc)));
+
+  updateStats(QStringLiteral("Extracted %1 bytes").arg(payloadSize));
+  updateUsageInfo();
+}
+
+void MainWindow::onFullscreen() {
+  if (previewModeCombo_->currentIndex() == 2) {
+    setStatus(QStringLiteral("Fullscreen not available in comparison mode"));
+    return;
+  }
+  if (!previewScene_ || previewScene_->items().isEmpty()) {
+    return;
+  }
+  QGraphicsPixmapItem *item =
+      dynamic_cast<QGraphicsPixmapItem *>(previewScene_->items().first());
+  if (!item)
+    return;
+  QPixmap pix = item->pixmap();
+  if (pix.isNull())
+    return;
+
+  QDialog *dialog = new QDialog(this);
+  dialog->setWindowTitle(QStringLiteral("Fullscreen Preview"));
+  dialog->setWindowState(Qt::WindowFullScreen);
+  QVBoxLayout *layout = new QVBoxLayout(dialog);
+  QGraphicsView *view = new QGraphicsView(dialog);
+  QGraphicsScene *scene = new QGraphicsScene(view);
+  scene->addPixmap(pix);
+  view->setScene(scene);
+  view->setRenderHint(QPainter::Antialiasing);
+  view->setBackgroundBrush(Qt::black);
+  view->setAlignment(Qt::AlignCenter);
+  view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  layout->addWidget(view);
+  QPushButton *closeBtn = new QPushButton(QStringLiteral("Close"), dialog);
+  connect(closeBtn, &QPushButton::clicked, dialog, &QDialog::accept);
+  layout->addWidget(closeBtn, 0, Qt::AlignCenter);
+  dialog->exec();
 }

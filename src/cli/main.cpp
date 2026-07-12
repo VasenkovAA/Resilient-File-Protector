@@ -47,7 +47,6 @@ std::optional<T> parseEnum(const char *str,
 }
 
 int runSelfTest(int argc, char **argv) {
-  // Параметры по умолчанию
   rfp::stego::StegoParams params;
   params.mode = rfp::stego::SlotSelectionMode::Uniform;
   params.windowSize = 3;
@@ -55,7 +54,6 @@ int runSelfTest(int argc, char **argv) {
   params.dispersionThreshold = 0.0;
   params.applyShuffleAfterSort = true;
 
-  // Парсинг аргументов
   for (int i = 2; i < argc; ++i) {
     if (std::strcmp(argv[i], "--mode") == 0 && i + 1 < argc) {
       ++i;
@@ -110,7 +108,6 @@ int runSelfTest(int argc, char **argv) {
     }
   }
 
-  // Тест
   rfp::stego::ImageBuffer image;
   image.width = 16;
   image.height = 16;

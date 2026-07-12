@@ -71,7 +71,7 @@ std::size_t availableSlotCount(const ImageBuffer &image,
                             static_cast<std::size_t>(image.height);
     return pixelCount * enabledChannelCount(image, params) *
            static_cast<std::size_t>(params.bitsPerChannel);
-  } else { // Smart
+  } else {
     DispersionCalculator calc(image, params);
     const auto pixelCount = static_cast<std::size_t>(image.width) *
                             static_cast<std::size_t>(image.height);
@@ -124,7 +124,7 @@ rfp::core::Result<std::vector<BitSlot>> buildSlots(const ImageBuffer &image,
 
     slots.resize(requiredBits);
     return slots;
-  } else { // Smart
+  } else {
     auto allSlots = generateAllSlots(image, params);
     DispersionCalculator calc(image, params);
 
