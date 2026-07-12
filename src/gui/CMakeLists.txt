@@ -1,9 +1,16 @@
+qt6_add_resources(rfp-gui_RESOURCES
+    docs.qrc
+)
+
 add_executable(rfp-gui
     main.cpp
     MainWindow.cpp
     MainWindow.h
     QtImageAdapter.cpp
     QtImageAdapter.h
+    HelpDialog.cpp
+    HelpDialog.h
+    ${rfp-gui_RESOURCES}
 )
 
 rfp_set_project_options(rfp-gui)

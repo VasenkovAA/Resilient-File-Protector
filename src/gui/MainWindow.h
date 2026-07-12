@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -9,6 +10,7 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPlainTextEdit>
+#include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSlider>
@@ -19,6 +21,8 @@
 
 #include <optional>
 #include <vector>
+
+#include "HelpDialog.h"
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -36,6 +40,8 @@ private slots:
   void extractText();
   void onTextChanged();
   void onFullscreen();
+  void onHelp();
+  void onLanguageChanged(QAction *action);
 
 private:
   void setupUi();
@@ -47,6 +53,11 @@ private:
   void setStatus(const QString &text);
   void setProgress(int value, int maximum = 0);
   void updateStats(const QString &text);
+
+  void createMenuBar();
+  void loadLanguageSetting();
+  void saveLanguageSetting(const QString &lang);
+  void applyTooltips();
 
   [[nodiscard]] rfp::stego::StegoParams collectParams() const;
   [[nodiscard]] QImage
@@ -100,10 +111,17 @@ private:
   QLabel *statusLabel_ = nullptr;
   QProgressBar *progressBar_ = nullptr;
 
+  QPushButton *embedButton_ = nullptr;
+  QPushButton *extractButton_ = nullptr;
+
   std::optional<rfp::stego::ImageBuffer> currentImage_;
   std::optional<rfp::stego::ImageBuffer> modifiedImage_;
 
   mutable std::optional<std::vector<double>> cachedDispersions_;
   mutable rfp::stego::StegoParams cachedParams_;
   mutable bool dispersionCacheValid_ = false;
+
+  QPointer<HelpDialog> helpDialog_;
+  QActionGroup *languageGroup_ = nullptr;
+  QString currentLanguage_ = "en";
 };

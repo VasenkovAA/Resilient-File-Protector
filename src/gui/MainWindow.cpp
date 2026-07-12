@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "HelpDialog.h"
 #include "QtImageAdapter.h"
 #include "rfp/core/ByteBuffer.h"
 #include "rfp/core/Crc32.h"
@@ -8,6 +9,7 @@
 #include "rfp/stego/StegoEncoder.h"
 #include "rfp/stego/StegoSlots.h"
 
+#include <QActionGroup>
 #include <QDialog>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -16,11 +18,13 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QPainter>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSettings>
 #include <QSlider>
 #include <QSplitter>
 #include <QStatusBar>
@@ -138,6 +142,117 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   updateCapacityInfo();
   updateUsageInfo();
   updateStats(QStringLiteral("Ready"));
+}
+
+void MainWindow::createMenuBar() {
+  auto *helpMenu = menuBar()->addMenu(tr("Help"));
+
+  auto *contentsAction = new QAction(tr("Contents"), this);
+  contentsAction->setShortcut(QKeySequence::HelpContents);
+  connect(contentsAction, &QAction::triggered, this, &MainWindow::onHelp);
+  helpMenu->addAction(contentsAction);
+
+  helpMenu->addSeparator();
+
+  auto *langMenu = helpMenu->addMenu(tr("Language"));
+  languageGroup_ = new QActionGroup(this);
+  languageGroup_->setExclusive(true);
+
+  auto *enAction = new QAction("English", this);
+  enAction->setCheckable(true);
+  enAction->setData("en");
+  languageGroup_->addAction(enAction);
+
+  auto *ruAction = new QAction("Русский", this);
+  ruAction->setCheckable(true);
+  ruAction->setData("ru");
+  languageGroup_->addAction(ruAction);
+
+  langMenu->addActions(languageGroup_->actions());
+  connect(languageGroup_, &QActionGroup::triggered, this,
+          &MainWindow::onLanguageChanged);
+}
+
+void MainWindow::loadLanguageSetting() {
+  QSettings settings;
+  QString lang = settings.value("Help/language", "en").toString();
+  currentLanguage_ = lang;
+  if (languageGroup_) {
+    for (auto *action : languageGroup_->actions()) {
+      if (action->data().toString() == lang) {
+        action->setChecked(true);
+        break;
+      }
+    }
+  }
+}
+
+void MainWindow::saveLanguageSetting(const QString &lang) {
+  QSettings settings;
+  settings.setValue("Help/language", lang);
+  currentLanguage_ = lang;
+}
+
+void MainWindow::onHelp() {
+  if (helpDialog_.isNull()) {
+    helpDialog_ = new HelpDialog(this);
+  }
+  helpDialog_->setLanguage(currentLanguage_);
+  helpDialog_->show();
+  helpDialog_->raise();
+  helpDialog_->activateWindow();
+}
+
+void MainWindow::onLanguageChanged(QAction *action) {
+  QString lang = action->data().toString();
+  if (lang == currentLanguage_)
+    return;
+  saveLanguageSetting(lang);
+  if (!helpDialog_.isNull() && helpDialog_->isVisible()) {
+    helpDialog_->setLanguage(lang);
+  }
+}
+
+void MainWindow::applyTooltips() {
+  inputImageEdit_->setToolTip("Path to the input image (PNG, BMP, TIFF)");
+  outputImageEdit_->setToolTip("Path where the stego image will be saved");
+
+  bitsPerChannelSpin_->setToolTip("Number of LSBs used per channel (1–4).");
+  seedSpin_->setToolTip("Random seed for shuffling slots. 0 = no shuffle.");
+  payloadSizeSpin_->setToolTip(
+      "Number of bytes to extract. Must match embedded payload size.");
+
+  redCheck_->setToolTip("Enable Red channel.");
+  greenCheck_->setToolTip("Enable Green channel.");
+  blueCheck_->setToolTip("Enable Blue channel.");
+  alphaCheck_->setToolTip("Enable Alpha channel (if present).");
+
+  modeCombo_->setToolTip("Select slot selection mode: Uniform "
+                         "(sequential/shuffled) or Smart (dispersion-based).");
+  windowSizeCombo_->setToolTip("Size of the square window for dispersion "
+                               "calculation (odd numbers 3–13).");
+  metricCombo_->setToolTip(
+      "Dispersion metric: Luminance, Per-channel, or Sum of variances.");
+  thresholdEdit_->setToolTip(
+      "Minimum dispersion value; slots below are discarded.");
+  autoThresholdButton_->setToolTip(
+      "Suggest a threshold based on 70th percentile of dispersions.");
+  shuffleAfterSortCheck_->setToolTip(
+      "If enabled, the sorted slot list is shuffled using the seed.");
+
+  showPreviewCheck_->setToolTip("Show/hide the preview area.");
+  previewModeCombo_->setToolTip(
+      "Preview mode: Original image, Dispersion overlay, or Comparison.");
+  overlayOpacitySlider_->setToolTip(
+      "Opacity of the dispersion overlay (0–100%).");
+  highlightChangesCheck_->setToolTip(
+      "Highlight pixels that differ between original and modified image in "
+      "comparison mode.");
+
+  embedButton_->setToolTip(
+      "Embed the current text into the image and save it.");
+  extractButton_->setToolTip(
+      "Extract hidden text from the input image using the current parameters.");
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {
@@ -383,6 +498,15 @@ void MainWindow::setupUi() {
 
   connect(embedButton, &QPushButton::clicked, this, &MainWindow::embedText);
   connect(extractButton, &QPushButton::clicked, this, &MainWindow::extractText);
+
+  embedButton_ = new QPushButton(QStringLiteral("Embed text"), leftPanel);
+  extractButton_ = new QPushButton(QStringLiteral("Extract text"), leftPanel);
+  actionsLayout->addWidget(embedButton_);
+  actionsLayout->addWidget(extractButton_);
+
+  createMenuBar();
+  applyTooltips();
+  loadLanguageSetting();
 }
 
 void MainWindow::setProgress(int value, int maximum) {

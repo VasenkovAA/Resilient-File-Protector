@@ -1,0 +1,18 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="/docs">
+    <file alias="en/index.md">../../docs/en/index.md</file>
+    <file alias="en/architecture.md">../../docs/en/architecture.md</file>
+    <file alias="en/steganography.md">../../docs/en/steganography.md</file>
+    <file alias="en/gui.md">../../docs/en/gui.md</file>
+    <file alias="en/cli.md">../../docs/en/cli.md</file>
+    <file alias="en/faq.md">../../docs/en/faq.md</file>
+    <file alias="en/security.md">../../docs/en/security.md</file>
+    <file alias="ru/index.md">../../docs/ru/index.md</file>
+    <file alias="ru/architecture.md">../../docs/ru/architecture.md</file>
+    <file alias="ru/steganography.md">../../docs/ru/steganography.md</file>
+    <file alias="ru/gui.md">../../docs/ru/gui.md</file>
+    <file alias="ru/cli.md">../../docs/ru/cli.md</file>
+    <file alias="ru/faq.md">../../docs/ru/faq.md</file>
+    <file alias="ru/security.md">../../docs/ru/security.md</file>
+</qresource>
+</RCC>
