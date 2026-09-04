@@ -61,7 +61,7 @@ int runSelfTest(int argc, char **argv) {
       if (val == "uniform")
         params.mode = rfp::stego::SlotSelectionMode::Uniform;
       else if (val == "smart")
-        params.mode = rfp::stego::SlotSelectionMode::Smart;
+        params.mode = rfp::stego::SlotSelectionMode::Dispersion;
       else {
         std::cerr << "Unknown mode\n";
         return EXIT_FAILURE;

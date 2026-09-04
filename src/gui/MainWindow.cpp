@@ -39,8 +39,6 @@
 #include <numeric>
 #include <sstream>
 
-
-
 namespace {
 QString crcToText(std::uint32_t crc) {
   return QStringLiteral("%1").arg(crc, 8, 16, QLatin1Char('0')).toUpper();
@@ -67,8 +65,7 @@ double computeAutoThreshold(const rfp::stego::ImageBuffer &image,
       static_cast<std::size_t>(static_cast<double>(values.size()) * 0.7);
   return values[idx];
 }
-}
-
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), settings_("RFP", "RFP-GUI") {
@@ -83,13 +80,11 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() { saveSettings(); }
 
-
 void MainWindow::setupUi() {
 
   auto *central = new QWidget(this);
   auto *mainLayout = new QVBoxLayout(central);
   mainLayout->setContentsMargins(0, 0, 0, 0);
-
 
   auto *toolBar = addToolBar(tr("Tools"));
   toolBar->setObjectName("mainToolBar");
@@ -102,16 +97,13 @@ void MainWindow::setupUi() {
   toolBar->addWidget(fullscreenButton_);
   toolBar->addWidget(helpButton_);
 
-
   tabWidget_ = new QTabWidget(this);
-
 
   embedTab_ = new QWidget(this);
   auto *embedLayout = new QHBoxLayout(embedTab_);
 
   auto *embedLeft = new QWidget(embedTab_);
   auto *embedLeftLayout = new QVBoxLayout(embedLeft);
-
 
   auto *filesGroup = new QGroupBox(tr("Images"), embedLeft);
   auto *filesLayout = new QGridLayout(filesGroup);
@@ -138,7 +130,6 @@ void MainWindow::setupUi() {
   filesLayout->addWidget(miniPreviewLabel_, 0, 3, 2, 1);
   embedLeftLayout->addWidget(filesGroup);
 
-
   auto *payloadGroup = new QGroupBox(tr("Text payload"), embedLeft);
   auto *payloadLayout = new QVBoxLayout(payloadGroup);
   payloadEdit_ = new QPlainTextEdit(payloadGroup);
@@ -148,7 +139,6 @@ void MainWindow::setupUi() {
   usageLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
   payloadLayout->addWidget(usageLabel_);
   embedLeftLayout->addWidget(payloadGroup, 1);
-
 
   auto *embedParamsGroup =
       new QGroupBox(tr("Steganography parameters (Embed)"), embedLeft);
@@ -184,7 +174,6 @@ void MainWindow::setupUi() {
   embedParamsLayout->addRow(tr("Seed (0 = sequential):"), embedSeedSpin_);
   embedParamsLayout->addRow(tr("Channels:"), channelsWidgetEmbed);
 
-
   auto *embedSmartGroup =
       new QGroupBox(tr("Smart selection"), embedParamsGroup);
   auto *embedSmartLayout = new QFormLayout(embedSmartGroup);
@@ -193,7 +182,7 @@ void MainWindow::setupUi() {
       tr("Uniform"), static_cast<int>(rfp::stego::SlotSelectionMode::Uniform));
   embedModeCombo_->addItem(
       tr("Smart (dispersion)"),
-      static_cast<int>(rfp::stego::SlotSelectionMode::Smart));
+      static_cast<int>(rfp::stego::SlotSelectionMode::Dispersion));
   embedModeCombo_->setCurrentIndex(0);
 
   embedWindowCombo_ = new QComboBox(embedSmartGroup);
@@ -234,7 +223,6 @@ void MainWindow::setupUi() {
 
   embedParamsLayout->addRow(embedSmartGroup);
 
-
   auto *embedButtonsLayout = new QHBoxLayout;
   auto *copyEmbedBtn = new QPushButton(tr("Copy params"), embedParamsGroup);
   copyEmbedBtn->setObjectName("copyEmbedBtn");
@@ -251,7 +239,6 @@ void MainWindow::setupUi() {
 
   embedLeftLayout->addWidget(embedParamsGroup);
 
-
   auto *actionsLayout = new QHBoxLayout;
   auto *embedBtn = new QPushButton(tr("Embed"), embedLeft);
   embedBtn->setObjectName("embedBtn");
@@ -260,7 +247,6 @@ void MainWindow::setupUi() {
   actionsLayout->addWidget(embedBtn);
   actionsLayout->addStretch();
   embedLeftLayout->addLayout(actionsLayout);
-
 
   auto *embedRight = new QWidget(embedTab_);
   auto *embedRightLayout = new QVBoxLayout(embedRight);
@@ -284,13 +270,11 @@ void MainWindow::setupUi() {
   embedLayout->addWidget(embedRight, 2);
   tabWidget_->addTab(embedTab_, tr("Embed"));
 
-
   extractTab_ = new QWidget(this);
   auto *extractLayout = new QHBoxLayout(extractTab_);
 
   auto *extractLeft = new QWidget(extractTab_);
   auto *extractLeftLayout = new QVBoxLayout(extractLeft);
-
 
   auto *extractFilesGroup = new QGroupBox(tr("Image"), extractLeft);
   auto *extractFilesLayout = new QGridLayout(extractFilesGroup);
@@ -302,7 +286,6 @@ void MainWindow::setupUi() {
   extractFilesLayout->addWidget(inputImageExtractEdit_, 0, 1);
   extractFilesLayout->addWidget(browseExtractBtn, 0, 2);
   extractLeftLayout->addWidget(extractFilesGroup);
-
 
   auto *extractParamsGroup =
       new QGroupBox(tr("Extraction options"), extractLeft);
@@ -319,7 +302,6 @@ void MainWindow::setupUi() {
   extractParamsLayout->addRow(tr("Payload size (bytes):"), payloadSizeSpin_);
 
   extractLeftLayout->addWidget(extractParamsGroup);
-
 
   auto *extractParamsGroup2 =
       new QGroupBox(tr("Steganography parameters (Extract)"), extractLeft);
@@ -355,7 +337,6 @@ void MainWindow::setupUi() {
   extractParamsLayout2->addRow(tr("Seed (0 = sequential):"), extractSeedSpin_);
   extractParamsLayout2->addRow(tr("Channels:"), channelsWidgetExtract);
 
-
   auto *extractSmartGroup =
       new QGroupBox(tr("Smart selection"), extractParamsGroup2);
   auto *extractSmartLayout = new QFormLayout(extractSmartGroup);
@@ -364,7 +345,7 @@ void MainWindow::setupUi() {
       tr("Uniform"), static_cast<int>(rfp::stego::SlotSelectionMode::Uniform));
   extractModeCombo_->addItem(
       tr("Smart (dispersion)"),
-      static_cast<int>(rfp::stego::SlotSelectionMode::Smart));
+      static_cast<int>(rfp::stego::SlotSelectionMode::Dispersion));
   extractModeCombo_->setCurrentIndex(0);
 
   extractWindowCombo_ = new QComboBox(extractSmartGroup);
@@ -405,7 +386,6 @@ void MainWindow::setupUi() {
 
   extractParamsLayout2->addRow(extractSmartGroup);
 
-
   auto *extractButtonsLayout = new QHBoxLayout;
   copyParamsBtn_ = new QPushButton(tr("Copy params"), extractParamsGroup2);
   pasteParamsBtn_ = new QPushButton(tr("Paste params"), extractParamsGroup2);
@@ -415,7 +395,6 @@ void MainWindow::setupUi() {
   extractParamsLayout2->addRow(extractButtonsLayout);
 
   extractLeftLayout->addWidget(extractParamsGroup2);
-
 
   auto *extractActionsLayout = new QHBoxLayout;
   auto *extractBtn = new QPushButton(tr("Extract"), extractLeft);
@@ -430,7 +409,6 @@ void MainWindow::setupUi() {
   extractedTextEdit_->setReadOnly(true);
   extractedTextEdit_->setPlaceholderText(tr("Extracted text will appear here"));
   extractLeftLayout->addWidget(extractedTextEdit_, 1);
-
 
   auto *extractRight = new QWidget(extractTab_);
   auto *extractRightLayout = new QVBoxLayout(extractRight);
@@ -449,7 +427,6 @@ void MainWindow::setupUi() {
 
   mainLayout->addWidget(tabWidget_);
 
-
   progressBar_ = new QProgressBar(this);
   progressBar_->setVisible(false);
   statusBar()->addWidget(progressBar_, 1);
@@ -458,7 +435,6 @@ void MainWindow::setupUi() {
 
   setCentralWidget(central);
 }
-
 
 void MainWindow::setupConnections() {
   auto *browseInputBtn = findChild<QPushButton *>("browseInputBtn");
@@ -494,7 +470,6 @@ void MainWindow::setupConnections() {
           &MainWindow::onFullscreen);
   connect(helpButton_, &QPushButton::clicked, this, &MainWindow::showHelp);
 
-
   connect(embedAutoThresholdBtn_, &QPushButton::clicked, this, [this]() {
     if (!currentImage_) {
       QMessageBox::warning(this, tr("R.F.P."),
@@ -516,7 +491,6 @@ void MainWindow::setupConnections() {
     extractThresholdEdit_->setText(QString::number(thr, 'f', 2));
   });
 
-
   auto *copyEmbedBtn = findChild<QPushButton *>("copyEmbedBtn");
   if (copyEmbedBtn)
     connect(copyEmbedBtn, &QPushButton::clicked, this,
@@ -526,7 +500,6 @@ void MainWindow::setupConnections() {
     connect(pasteEmbedBtn, &QPushButton::clicked, this,
             &MainWindow::pasteEmbedParams);
 
-
   connect(copyParamsBtn_, &QPushButton::clicked, this,
           &MainWindow::copyExtractParams);
   connect(pasteParamsBtn_, &QPushButton::clicked, this,
@@ -534,7 +507,6 @@ void MainWindow::setupConnections() {
 
   connect(payloadEdit_, &QPlainTextEdit::textChanged, this,
           &MainWindow::onTextChanged);
-
 
   auto updateEmbedCapacity = [this]() {
     updateCapacityInfo();
@@ -560,8 +532,6 @@ void MainWindow::setupConnections() {
   connect(embedThresholdEdit_, &QLineEdit::textChanged, this,
           updateEmbedCapacity);
   connect(embedShuffleCheck_, &QCheckBox::toggled, this, updateEmbedCapacity);
-
-
 
   auto updateExtractPreview = [this]() { updatePreview(); };
   connect(extractBitsSpin_, QOverload<int>::of(&QSpinBox::valueChanged), this,
@@ -593,15 +563,11 @@ void MainWindow::setupConnections() {
           &MainWindow::saveSettings);
 }
 
-
 void MainWindow::loadSettings() {
   settings_.beginGroup("MainWindow");
   resize(settings_.value("size", QSize(1200, 700)).toSize());
   move(settings_.value("pos", QPoint(100, 100)).toPoint());
   settings_.endGroup();
-
-
-
 
   settings_.beginGroup("ParamsEmbed");
   embedBitsSpin_->setValue(settings_.value("bits", 1).toInt());
@@ -655,8 +621,6 @@ void MainWindow::saveSettings() {
   settings_.setValue("pos", pos());
   settings_.endGroup();
 
-
-
   settings_.beginGroup("ParamsEmbed");
   settings_.setValue("bits", embedBitsSpin_->value());
   settings_.setValue("seed", embedSeedSpin_->value());
@@ -701,7 +665,6 @@ void MainWindow::saveSettings() {
   settings_.endGroup();
 }
 
-
 void MainWindow::applySettings() {
   if (darkTheme_) {
     QPalette darkPalette;
@@ -738,7 +701,6 @@ void MainWindow::applySettings() {
   }
   updatePreview();
 }
-
 
 void MainWindow::closeEvent(QCloseEvent *event) {
   saveSettings();
@@ -779,7 +741,6 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
   }
   QMainWindow::keyPressEvent(event);
 }
-
 
 void MainWindow::browseInputImage() {
   QString path = QFileDialog::getOpenFileName(
@@ -824,7 +785,6 @@ void MainWindow::browseOutputImage() {
   if (!path.isEmpty())
     outputImageEdit_->setText(path);
 }
-
 
 void MainWindow::embedText() {
   if (embedding_)
@@ -932,7 +892,6 @@ void MainWindow::onEmbedFinished() {
   setProgress(0, 0);
 }
 
-
 void MainWindow::extractText() {
   if (extracting_)
     return;
@@ -1006,9 +965,7 @@ void MainWindow::onExtractFinished() {
   setProgress(0, 0);
 }
 
-
 void MainWindow::onTextChanged() { updateUsageInfo(); }
-
 
 void MainWindow::updateCapacityInfo() {
   if (!currentImage_) {
@@ -1019,7 +976,7 @@ void MainWindow::updateCapacityInfo() {
   auto capBytes = rfp::stego::capacityBytes(currentImage_.value(), params);
   auto capBits = rfp::stego::capacityBits(currentImage_.value(), params);
   QString info = tr("Capacity: %1 bytes (%2 bits)").arg(capBytes).arg(capBits);
-  if (params.mode == rfp::stego::SlotSelectionMode::Smart) {
+  if (params.mode == rfp::stego::SlotSelectionMode::Dispersion) {
     rfp::stego::StegoParams uniformParams = params;
     uniformParams.mode = rfp::stego::SlotSelectionMode::Uniform;
     auto totalBytes =
@@ -1056,7 +1013,6 @@ void MainWindow::updateUsageInfo() {
           .arg(percent, 0, 'f', 1));
 }
 
-
 void MainWindow::updatePreview() {
   if (!currentImage_ || !showPreview_) {
     previewScene_->clear();
@@ -1069,7 +1025,7 @@ void MainWindow::updatePreview() {
     break;
   case 1: {
     auto params = collectParams(false);
-    if (params.mode == rfp::stego::SlotSelectionMode::Smart) {
+    if (params.mode == rfp::stego::SlotSelectionMode::Dispersion) {
       double minVal, maxVal, meanVal;
       QImage overlay = generateDispersionOverlay(currentImage_.value(), params,
                                                  minVal, maxVal, meanVal);
@@ -1122,7 +1078,6 @@ void MainWindow::updatePreview() {
   }
 }
 
-
 void MainWindow::showImage(const QImage &image, bool fit) {
   if (!previewScene_)
     return;
@@ -1171,7 +1126,6 @@ void MainWindow::updateStats(const QString &text) {
   statsLabel_->setText(text);
 }
 
-
 rfp::stego::StegoParams MainWindow::collectParams(bool forExtract) const {
   rfp::stego::StegoParams params;
   if (forExtract) {
@@ -1206,8 +1160,6 @@ rfp::stego::StegoParams MainWindow::collectParams(bool forExtract) const {
   }
   return params;
 }
-
-
 
 QString MainWindow::serializeFull(const rfp::stego::StegoParams &params,
                                   const QString &inputPath,
@@ -1295,8 +1247,6 @@ bool MainWindow::deserializeFull(const QString &str,
   return true;
 }
 
-
-
 void MainWindow::copyEmbedParams() {
   auto params = collectParams(false);
   QString str =
@@ -1339,7 +1289,6 @@ void MainWindow::pasteEmbedParams() {
       QString::number(params.dispersionThreshold, 'f', 2));
   embedShuffleCheck_->setChecked(params.applyShuffleAfterSort);
 
-
   if (!inputPath.isEmpty())
     inputImageEdit_->setText(inputPath);
   if (!outputPath.isEmpty())
@@ -1351,12 +1300,8 @@ void MainWindow::pasteEmbedParams() {
   updateUsageInfo();
 }
 
-
-
 void MainWindow::copyExtractParams() {
   auto params = collectParams(true);
-
-
 
   QString str = serializeFull(params, QString(), QString());
   QClipboard *clipboard = QApplication::clipboard();
@@ -1398,8 +1343,6 @@ void MainWindow::pasteExtractParams() {
       QString::number(params.dispersionThreshold, 'f', 2));
   extractShuffleCheck_->setChecked(params.applyShuffleAfterSort);
 
-
-
   if (!outputPath.isEmpty()) {
     inputImageExtractEdit_->setText(outputPath);
     setStatus(tr("Extraction parameters pasted and input path set to output "
@@ -1410,7 +1353,6 @@ void MainWindow::pasteExtractParams() {
   }
   updatePreview();
 }
-
 
 QImage
 MainWindow::imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const {
@@ -1439,10 +1381,24 @@ MainWindow::generateDispersionOverlay(const rfp::stego::ImageBuffer &buffer,
   QImage overlay(static_cast<int>(buffer.width),
                  static_cast<int>(buffer.height), QImage::Format_ARGB32);
   overlay.fill(Qt::transparent);
-  if (!buffer.isValid() || params.mode != rfp::stego::SlotSelectionMode::Smart)
+  if (!buffer.isValid() ||
+      params.mode != rfp::stego::SlotSelectionMode::Dispersion)
     return overlay;
 
-  if (!dispersionCacheValid_ || cachedParams_ != params) {
+  bool paramsEqual =
+      (cachedParams_.mode == params.mode &&
+       cachedParams_.metric == params.metric &&
+       cachedParams_.dispersionThreshold == params.dispersionThreshold &&
+       cachedParams_.windowSize == params.windowSize &&
+       cachedParams_.bitsPerChannel == params.bitsPerChannel &&
+       cachedParams_.useRedChannel == params.useRedChannel &&
+       cachedParams_.useGreenChannel == params.useGreenChannel &&
+       cachedParams_.useBlueChannel == params.useBlueChannel &&
+       cachedParams_.useAlphaChannel == params.useAlphaChannel &&
+       cachedParams_.seed == params.seed &&
+       cachedParams_.applyShuffleAfterSort == params.applyShuffleAfterSort);
+
+  if (!dispersionCacheValid_ || !paramsEqual) {
     setProgress(0, 100);
     setStatus(tr("Computing dispersion..."));
     rfp::stego::DispersionCalculator calc(buffer, params);
@@ -1556,7 +1512,6 @@ QImage MainWindow::generateChangesMask(const QImage &original,
   return mask;
 }
 
-
 void MainWindow::onFullscreen() {
   if (previewView_) {
     if (previewView_->isFullScreen())
@@ -1565,7 +1520,6 @@ void MainWindow::onFullscreen() {
       previewView_->setWindowState(Qt::WindowFullScreen);
   }
 }
-
 
 void MainWindow::showSettings() {
   if (!settingsDialog_) {
@@ -1582,7 +1536,6 @@ void MainWindow::showSettings() {
       if (newLang != language_) {
         language_ = newLang;
         saveSettings();
-
 
         qApp->quit();
         QProcess::startDetached(qApp->arguments()[0], qApp->arguments());
@@ -1656,14 +1609,9 @@ void MainWindow::runMasking(const QString &dir, const QString &ext, int count,
   });
 }
 
+void MainWindow::onAutoThreshold() {}
 
-void MainWindow::onAutoThreshold() {
-
-}
-
-void MainWindow::updateExtractParamsInfo() {
-
-}
+void MainWindow::updateExtractParamsInfo() {}
 
 void MainWindow::onDispersionFinished() {}
 void MainWindow::onMaskingFinished() {}

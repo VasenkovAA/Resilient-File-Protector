@@ -27,3 +27,12 @@ buildSlots(const ImageBuffer &image, const StegoParams &params,
            std::size_t requiredBits);
 
 } // namespace rfp::stego::detail
+namespace rfp::stego::detail {
+
+/**
+ * @brief Check if a specific channel is enabled in parameters
+ */
+bool channelEnabled(std::uint8_t channelIndex,
+                    const StegoParams &params) noexcept;
+
+} // namespace rfp::stego::detail

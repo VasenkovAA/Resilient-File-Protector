@@ -4,35 +4,47 @@
 
 namespace rfp::stego {
 
-enum class SlotSelectionMode : std::uint8_t { Uniform, Smart };
+/**
+ * @brief Dispersion calculation methods
+ */
+enum class DispersionMetric {
+  Luminance,  ///< Use weighted luminance (RGB → Y)
+  PerChannel, ///< Calculate per-color channel separately
+  Sum         ///< Sum of per-channel dispersions
+};
 
-enum class DispersionMetric : std::uint8_t { Luminance, PerChannel, Sum };
+/**
+ * @brief Slot selection strategies
+ */
+enum class SlotSelectionMode {
+  Uniform,   ///< Use all available slots uniformly
+  Dispersion ///< Select slots with high local dispersion
+};
 
+/**
+ * @brief Steganography parameters
+ */
 struct StegoParams {
-  std::uint8_t bitsPerChannel = 1;
-  std::uint32_t seed = 0;
+  // Slot selection
+  SlotSelectionMode mode = SlotSelectionMode::Uniform;
+
+  // Dispersion-based selection parameters
+  DispersionMetric metric = DispersionMetric::Luminance;
+  double dispersionThreshold = 100.0;
+  int windowSize = 5; // Must be odd, >= 3
+
+  // Bit embedding parameters
+  std::uint8_t bitsPerChannel = 1; // [1, 4]
+
+  // Channel enable flags
   bool useRedChannel = true;
   bool useGreenChannel = true;
   bool useBlueChannel = true;
-  bool useAlphaChannel = false;
+  bool useAlphaChannel = false; // Usually disabled by default
 
-  SlotSelectionMode mode = SlotSelectionMode::Uniform;
-  int windowSize = 3;
-  DispersionMetric metric = DispersionMetric::Luminance;
-  double dispersionThreshold = 0.0;
-  bool applyShuffleAfterSort = true;
-
-  bool operator==(const StegoParams &other) const {
-    return bitsPerChannel == other.bitsPerChannel && seed == other.seed &&
-           useRedChannel == other.useRedChannel &&
-           useGreenChannel == other.useGreenChannel &&
-           useBlueChannel == other.useBlueChannel &&
-           useAlphaChannel == other.useAlphaChannel && mode == other.mode &&
-           windowSize == other.windowSize && metric == other.metric &&
-           dispersionThreshold == other.dispersionThreshold &&
-           applyShuffleAfterSort == other.applyShuffleAfterSort;
-  }
-  bool operator!=(const StegoParams &other) const { return !(*this == other); }
+  // Randomization
+  std::uint32_t seed = 0; // 0 = no randomization
+  bool applyShuffleAfterSort = false;
 };
 
 } // namespace rfp::stego

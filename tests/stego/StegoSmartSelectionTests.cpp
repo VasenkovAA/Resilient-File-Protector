@@ -33,7 +33,7 @@ rfp::stego::ImageBuffer makeGradientImage(std::uint32_t w, std::uint32_t h) {
 TEST(SmartSelectionTests, CapacitySmartFiltersByThreshold) {
   auto img = makeGradientImage(10, 10);
   rfp::stego::StegoParams params;
-  params.mode = rfp::stego::SlotSelectionMode::Smart;
+  params.mode = rfp::stego::SlotSelectionMode::Dispersion;
   params.metric = rfp::stego::DispersionMetric::Luminance;
   params.windowSize = 3;
   params.bitsPerChannel = 1;
@@ -47,7 +47,7 @@ TEST(SmartSelectionTests, CapacitySmartFiltersByThreshold) {
 TEST(SmartSelectionTests, RoundTripWithSmartSelection) {
   auto img = makeGradientImage(16, 16);
   rfp::stego::StegoParams params;
-  params.mode = rfp::stego::SlotSelectionMode::Smart;
+  params.mode = rfp::stego::SlotSelectionMode::Dispersion;
   params.metric = rfp::stego::DispersionMetric::Luminance;
   params.windowSize = 3;
   params.bitsPerChannel = 1;
@@ -69,7 +69,7 @@ TEST(SmartSelectionTests, RoundTripWithSmartSelection) {
 TEST(SmartSelectionTests, BuildSlotsSmartRespectsThreshold) {
   auto img = makeGradientImage(5, 5);
   rfp::stego::StegoParams params;
-  params.mode = rfp::stego::SlotSelectionMode::Smart;
+  params.mode = rfp::stego::SlotSelectionMode::Dispersion;
   params.metric = rfp::stego::DispersionMetric::Luminance;
   params.windowSize = 3;
   params.bitsPerChannel = 1;
