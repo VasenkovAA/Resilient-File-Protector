@@ -6,6 +6,7 @@ add_executable(rfp-tests
     stego/StegoDispersionTests.cpp
     stego/StegoRoundTripTests.cpp
     stego/StegoSmartSelectionTests.cpp
+    stego/StegoEdgeCasesTests.cpp
 )
 
 rfp_set_project_options(rfp-tests)
@@ -16,6 +17,7 @@ target_link_libraries(rfp-tests
         rfp::core
         rfp::stego
         GTest::gtest_main
+        
 )
 
 gtest_discover_tests(rfp-tests)
