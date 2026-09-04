@@ -1,9 +1,6 @@
 #include "HelpDialog.h"
 #include <QFile>
-#include <QIODevice>
 #include <QSplitter>
-#include <QTextBrowser>
-#include <QTreeWidget>
 #include <QVBoxLayout>
 
 HelpDialog::HelpDialog(QWidget *parent) : QDialog(parent) {
@@ -11,7 +8,6 @@ HelpDialog::HelpDialog(QWidget *parent) : QDialog(parent) {
   resize(900, 600);
 
   auto *splitter = new QSplitter(Qt::Horizontal, this);
-
   tocWidget_ = new QTreeWidget(this);
   tocWidget_->setHeaderHidden(true);
   tocWidget_->setMinimumWidth(200);
@@ -35,15 +31,11 @@ HelpDialog::HelpDialog(QWidget *parent) : QDialog(parent) {
 void HelpDialog::setLanguage(const QString &lang) {
   if (lang == currentLang_)
     return;
-
   QString currentPage;
-  if (tocWidget_->currentItem()) {
+  if (tocWidget_->currentItem())
     currentPage = tocWidget_->currentItem()->data(0, Qt::UserRole).toString();
-  }
-
   currentLang_ = lang;
   buildToc();
-
   if (!currentPage.isEmpty()) {
     QTreeWidgetItemIterator it(tocWidget_);
     while (*it) {
@@ -64,15 +56,13 @@ void HelpDialog::buildToc() {
     QString display;
     QString file;
   };
-  QList<PageInfo> pages = {
-      {tr("Introduction"), "index"},
-      {tr("Architecture"), "architecture"},
-      {tr("Steganography parameters"), "steganography"},
-      {tr("Security recommendations"), "security"}, // новая строка
-      {tr("GUI guide"), "gui"},
-      {tr("Command line"), "cli"},
-      {tr("FAQ"), "faq"}};
-
+  QList<PageInfo> pages = {{tr("Introduction"), "index"},
+                           {tr("Architecture"), "architecture"},
+                           {tr("Steganography parameters"), "steganography"},
+                           {tr("Security recommendations"), "security"},
+                           {tr("GUI guide"), "gui"},
+                           {tr("Command line"), "cli"},
+                           {tr("FAQ"), "faq"}};
   for (const auto &p : pages) {
     auto *item = new QTreeWidgetItem(tocWidget_);
     item->setText(0, p.display);
@@ -91,7 +81,6 @@ void HelpDialog::loadPage(const QString &pageName) {
   }
   QString content = QString::fromUtf8(file.readAll());
   file.close();
-
   textBrowser_->setMarkdown(content);
 }
 

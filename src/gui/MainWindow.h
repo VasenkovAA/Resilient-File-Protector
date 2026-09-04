@@ -1,37 +1,39 @@
 #pragma once
 
-#include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDialog>
+#include <QFutureWatcher>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPlainTextEdit>
-#include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QSlider>
+#include <QSettings>
 #include <QSpinBox>
+#include <QTabWidget>
 
 #include "rfp/stego/ImageBuffer.h"
 #include "rfp/stego/StegoParams.h"
-
 #include <optional>
 #include <vector>
 
-#include "HelpDialog.h"
+class SettingsDialog;
+class MaskingDialog;
+class HelpDialog;
 
-class MainWindow final : public QMainWindow {
+class MainWindow : public QMainWindow {
   Q_OBJECT
-
 public:
   explicit MainWindow(QWidget *parent = nullptr);
+  ~MainWindow();
 
 protected:
   void resizeEvent(QResizeEvent *event) override;
+  void closeEvent(QCloseEvent *event) override;
+  void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
   void browseInputImage();
@@ -40,26 +42,45 @@ private slots:
   void extractText();
   void onTextChanged();
   void onFullscreen();
-  void onHelp();
-  void onLanguageChanged(QAction *action);
+  void showSettings();
+  void showMasking();
+  void showHelp();
+  void updatePreview();
+  void updateCapacityInfo();
+  void updateUsageInfo();
+  void updateMiniPreview();
+  void applySettings();
+  void onEmbedFinished();
+  void onExtractFinished();
+  void onDispersionFinished();
+  void onMaskingFinished();
+  void onAutoThreshold();
+  void updateExtractParamsInfo();
+
+
+  void copyEmbedParams();
+  void pasteEmbedParams();
+  void copyExtractParams();
+  void pasteExtractParams();
 
 private:
   void setupUi();
-  void updateCapacityInfo();
-  void updatePreview();
-  void updateMiniPreview();
-  void updateUsageInfo();
-  void showImage(QGraphicsScene *scene, const QImage &image);
-  void setStatus(const QString &text);
+  void setupConnections();
+  void loadSettings();
+  void saveSettings();
+  void showImage(const QImage &image, bool fit = true);
+  void setStatus(const QString &text, int timeout = 0);
   void setProgress(int value, int maximum = 0);
   void updateStats(const QString &text);
+  void runEmbed(const QString &input, const QString &output,
+                const QByteArray &data);
+  void runExtract(const QString &input, size_t payloadSize);
+  void runDispersion();
+  void runMasking(const QString &dir, const QString &ext, int count,
+                  bool recursive, const QString &exclude);
 
-  void createMenuBar();
-  void loadLanguageSetting();
-  void saveLanguageSetting(const QString &lang);
-  void applyTooltips();
-
-  [[nodiscard]] rfp::stego::StegoParams collectParams() const;
+  [[nodiscard]] rfp::stego::StegoParams
+  collectParams(bool forExtract = false) const;
   [[nodiscard]] QImage
   imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const;
   QImage generateDispersionOverlay(const rfp::stego::ImageBuffer &buffer,
@@ -74,54 +95,91 @@ private:
   [[nodiscard]] QColor dispersionToColor(double value, double minVal,
                                          double maxVal) const;
 
-  QLineEdit *inputImageEdit_ = nullptr;
-  QLineEdit *outputImageEdit_ = nullptr;
-  QPlainTextEdit *payloadEdit_ = nullptr;
-  QSpinBox *payloadSizeSpin_ = nullptr;
 
-  QSpinBox *bitsPerChannelSpin_ = nullptr;
-  QSpinBox *seedSpin_ = nullptr;
-  QCheckBox *redCheck_ = nullptr;
-  QCheckBox *greenCheck_ = nullptr;
-  QCheckBox *blueCheck_ = nullptr;
-  QCheckBox *alphaCheck_ = nullptr;
+  [[nodiscard]] QString serializeFull(const rfp::stego::StegoParams &params,
+                                      const QString &inputPath,
+                                      const QString &outputPath) const;
+  [[nodiscard]] bool deserializeFull(const QString &str,
+                                     rfp::stego::StegoParams &params,
+                                     QString &inputPath,
+                                     QString &outputPath) const;
 
-  QComboBox *modeCombo_ = nullptr;
-  QComboBox *windowSizeCombo_ = nullptr;
-  QComboBox *metricCombo_ = nullptr;
-  QLineEdit *thresholdEdit_ = nullptr;
-  QPushButton *autoThresholdButton_ = nullptr;
-  QCheckBox *shuffleAfterSortCheck_ = nullptr;
 
-  QLabel *miniPreviewLabel_ = nullptr;
+  QTabWidget *tabWidget_;
+  QWidget *embedTab_;
+  QLineEdit *inputImageEdit_;
+  QLineEdit *outputImageEdit_;
+  QPlainTextEdit *payloadEdit_;
+  QLabel *usageLabel_;
+  QLabel *capacityLabel_;
 
-  QGraphicsView *previewView_ = nullptr;
-  QGraphicsScene *previewScene_ = nullptr;
-  QPushButton *fullscreenButton_ = nullptr;
 
-  QCheckBox *showPreviewCheck_ = nullptr;
-  QComboBox *previewModeCombo_ = nullptr;
-  QSlider *overlayOpacitySlider_ = nullptr;
-  QCheckBox *highlightChangesCheck_ = nullptr;
-  QLabel *statsLabel_ = nullptr;
+  QSpinBox *embedBitsSpin_;
+  QSpinBox *embedSeedSpin_;
+  QCheckBox *embedRed_, *embedGreen_, *embedBlue_, *embedAlpha_;
+  QComboBox *embedModeCombo_;
+  QComboBox *embedWindowCombo_;
+  QComboBox *embedMetricCombo_;
+  QLineEdit *embedThresholdEdit_;
+  QPushButton *embedAutoThresholdBtn_;
+  QCheckBox *embedShuffleCheck_;
 
-  QLabel *capacityLabel_ = nullptr;
-  QLabel *usageLabel_ = nullptr;
 
-  QLabel *statusLabel_ = nullptr;
-  QProgressBar *progressBar_ = nullptr;
+  QSpinBox *extractBitsSpin_;
+  QSpinBox *extractSeedSpin_;
+  QCheckBox *extractRed_, *extractGreen_, *extractBlue_, *extractAlpha_;
+  QComboBox *extractModeCombo_;
+  QComboBox *extractWindowCombo_;
+  QComboBox *extractMetricCombo_;
+  QLineEdit *extractThresholdEdit_;
+  QPushButton *extractAutoThresholdBtn_;
+  QCheckBox *extractShuffleCheck_;
 
-  QPushButton *embedButton_ = nullptr;
-  QPushButton *extractButton_ = nullptr;
+  QWidget *extractTab_;
+  QLineEdit *inputImageExtractEdit_;
+  QPlainTextEdit *extractedTextEdit_;
+  QSpinBox *payloadSizeSpin_;
+  QCheckBox *autoDetectSizeCheck_;
+
+  QGraphicsView *previewView_;
+  QGraphicsScene *previewScene_;
+  QLabel *miniPreviewLabel_;
+  QLabel *statsLabel_;
+  QProgressBar *progressBar_;
+  QLabel *statusLabel_;
+  QPushButton *settingsButton_;
+  QPushButton *maskingButton_;
+  QPushButton *fullscreenButton_;
+  QPushButton *helpButton_;
+  QPushButton *copyParamsBtn_;
+  QPushButton *pasteParamsBtn_;
+
 
   std::optional<rfp::stego::ImageBuffer> currentImage_;
   std::optional<rfp::stego::ImageBuffer> modifiedImage_;
+  std::optional<QImage> currentQImage_;
+  std::optional<QImage> modifiedQImage_;
+
+  bool showPreview_ = true;
+  int previewMode_ = 0;
+  int overlayOpacity_ = 50;
+  bool highlightChanges_ = false;
+  bool darkTheme_ = false;
+  QString language_ = "en";
+  bool writeHeader_ = true;
 
   mutable std::optional<std::vector<double>> cachedDispersions_;
   mutable rfp::stego::StegoParams cachedParams_;
   mutable bool dispersionCacheValid_ = false;
 
-  QPointer<HelpDialog> helpDialog_;
-  QActionGroup *languageGroup_ = nullptr;
-  QString currentLanguage_ = "en";
+  QFutureWatcher<rfp::core::Result<rfp::stego::ImageBuffer>> embedWatcher_;
+  QFutureWatcher<rfp::core::Result<rfp::core::ByteBuffer>> extractWatcher_;
+  QFutureWatcher<void> maskingWatcher_;
+  QFutureWatcher<void> dispersionWatcher_;
+  bool embedding_ = false, extracting_ = false;
+
+  QSettings settings_;
+  SettingsDialog *settingsDialog_ = nullptr;
+  MaskingDialog *maskingDialog_ = nullptr;
+  HelpDialog *helpDialog_ = nullptr;
 };
