@@ -26,6 +26,7 @@ endforeach()
 
 include(ProjectOptions)
 include(CompilerWarnings)
+include(Coverage)
 
 add_subdirectory(src/core)
 add_subdirectory(src/stego)
@@ -52,3 +53,5 @@ if(RFP_BUILD_TESTS)
     find_package(GTest REQUIRED)
     add_subdirectory(tests)
 endif()
+
+rfp_add_coverage_target()  

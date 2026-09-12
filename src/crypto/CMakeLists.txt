@@ -2,6 +2,13 @@ include(${PROJECT_SOURCE_DIR}/cmake/OpenSSL.cmake)
 
 add_library(rfp_crypto STATIC
     CryptoPlaceholder.cpp
+    CryptoRegistry.cpp
+    Cipher.cpp
+    Hash.cpp
+    Kdf.cpp
+    Random.cpp
+    SecureMemory.cpp
+    Encoding.cpp
 )
 
 add_library(rfp::crypto ALIAS rfp_crypto)
@@ -19,5 +26,4 @@ target_link_libraries(rfp_crypto
         rfp::core
     PRIVATE
         OpenSSL::Crypto
-        OpenSSL::SSL
 )

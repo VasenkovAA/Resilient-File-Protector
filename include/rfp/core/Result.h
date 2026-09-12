@@ -23,6 +23,7 @@ public:
         return hasValue();
     }
 
+    // ---- accessors (unchanged) ----
     [[nodiscard]] const T& value() const&
     {
         return std::get<T>(data_);
@@ -43,6 +44,19 @@ public:
         return std::get<Error>(data_);
     }
 
+    [[nodiscard]] Error& error() &
+    {
+        return std::get<Error>(data_);
+    }
+
+    // ---- optional-like sugar: *res / res->field ----
+    [[nodiscard]] const T& operator*() const&  noexcept { return value(); }
+    [[nodiscard]] T&       operator*() &       noexcept { return value(); }
+    [[nodiscard]] T&&      operator*() &&      noexcept { return std::move(*this).value(); }
+
+    [[nodiscard]] const T* operator->() const noexcept { return &value(); }
+    [[nodiscard]] T*       operator->()       noexcept { return &value(); }
+
 private:
     std::variant<T, Error> data_;
 };
@@ -53,20 +67,9 @@ public:
     Result() = default;
     Result(Error error) : error_(std::move(error)) {}
 
-    [[nodiscard]] bool hasValue() const noexcept
-    {
-        return error_.ok();
-    }
-
-    [[nodiscard]] explicit operator bool() const noexcept
-    {
-        return hasValue();
-    }
-
-    [[nodiscard]] const Error& error() const noexcept
-    {
-        return error_;
-    }
+    [[nodiscard]] bool hasValue() const noexcept { return error_.ok(); }
+    [[nodiscard]] explicit operator bool() const noexcept { return hasValue(); }
+    [[nodiscard]] const Error& error() const noexcept { return error_; }
 
 private:
     Error error_{};
