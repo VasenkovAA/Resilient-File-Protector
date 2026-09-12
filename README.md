@@ -1,16 +1,17 @@
 # R.F.P. — Resilient File Protector
 
-**Resilient File Protector** is a C++20/Qt 6 project for hiding private data inside ordinary‑looking files.  
-The first implementation stage focuses on steganography in raster images, primarily PNG.
+**Resilient File Protector** is a C++20 / Qt 6 project for hiding private data inside ordinary‑looking files.
+The first implementation stage focuses on steganography in raster images, primarily PNG; the encryption layer is being built on top of **OpenSSL**.
 
 The project is intentionally split into an independent core and a GUI application:
 
 - `rfp_core` — common byte buffers, errors and utility algorithms;
 - `rfp_stego` — steganography algorithms independent from Qt;
-- `rfp_crypto` — placeholder module for the future encryption stage;
+- `rfp_crypto` — cryptography layer built on **OpenSSL** (replaces the earlier Botan placeholder);
 - `rfp_gui` — Qt 6.8 LTS desktop application;
 - `rfp_cli` — small command‑line utility useful for testing and automation;
-- `tests` — GoogleTest‑based unit tests.
+- `tests` — GoogleTest‑based unit tests;
+- `third_party/openssl` — OpenSSL submodule (optional, used when the system does not provide it).
 
 ## Current stage
 
@@ -25,13 +26,14 @@ The project is intentionally split into an independent core and a GUI applicatio
   - **Smart** – dispersion‑based filtering and sorting for better visual concealment.
 - GUI displays real‑time capacity and CRC32 integrity checks.
 - CLI self‑test supports all parameters.
+- **Cryptography module (`rfp_crypto`) linked against OpenSSL 3.x** — foundation for the future block encryption stage.
 
 ## Important design decision
 
-The application does **not** write anything into image metadata such as EXIF, PNG text chunks or custom file headers.  
+The application does **not** write anything into image metadata such as EXIF, PNG text chunks or custom file headers.
 The image remains a normal raster image.
 
-Extraction requires the **same** parameters that were used during embedding.  
+Extraction requires the **same** parameters that were used during embedding.
 The GUI shows all parameters after embedding, so you can record them.
 
 ## Steganography parameters
@@ -55,13 +57,42 @@ The GUI provides an **Auto** button that suggests a threshold (70th percentile o
 
 ---
 
+## OpenSSL integration
+
+The `rfp_crypto` module links against OpenSSL (`libcrypto` + `libssl`).
+The build system supports three modes, controlled by the CMake cache variable `RFP_USE_SUBMODULE_OPENSSL`:
+
+| Value  | Behaviour |
+|--------|-----------|
+| `AUTO` *(default)* | Use system OpenSSL if found; otherwise build from `third_party/openssl`. |
+| `ON`   | Always build OpenSSL from the `third_party/openssl` submodule. |
+| `OFF`  | Always use system OpenSSL; fail if not found. |
+
+The integration logic lives in `cmake/OpenSSL.cmake`. When the submodule is used, OpenSSL is built statically via `ExternalProject_Add` and exposed as the imported targets `OpenSSL::Crypto` and `OpenSSL::SSL`.
+
+**Recommended:** rely on the system package (`libssl-dev` on Ubuntu, `openssl` via Homebrew on macOS, `openssl` via vcpkg on Windows). This is fast and avoids building OpenSSL on every clean checkout.
+
+To initialise the submodule only when you actually need it:
+
+```bash
+git submodule update --init --recursive third_party/openssl
+```
+
+Then configure with:
+
+```bash
+cmake --preset dev -DRFP_USE_SUBMODULE_OPENSSL=ON
+```
+
+---
+
 ## Build and run
 
 The project supports several ways to build and run the code. Choose the one that fits your environment best.
 
 ### 1. Dev Container (recommended for VS Code)
 
-The repository includes a `.devcontainer` folder with a `Dockerfile` and `devcontainer.json`. This sets up a complete development environment with all dependencies (CMake, Ninja, GCC, Qt 6.8, GoogleTest).
+The repository includes a `.devcontainer` folder with a `Dockerfile` and `devcontainer.json`. This sets up a complete development environment with all dependencies (CMake, Ninja, GCC, Qt 6, GoogleTest, OpenSSL).
 
 **Steps:**
 
@@ -136,10 +167,11 @@ sudo apt install -y build-essential cmake ninja-build \
     libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
     libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
     libxcb-xinerama0 libxcb-xinput0 \
-    libgtest-dev git ca-certificates
+    libgtest-dev libssl-dev pkg-config \
+    git ca-certificates
 ```
 
-> **Note:** If your distribution does not provide Qt 6.8 LTS, use the Qt online installer or `aqtinstall`.
+> **Note:** `libssl-dev` provides the system OpenSSL 3.x used by default. If your distribution does not provide Qt 6.8 LTS, use the Qt online installer or `aqtinstall`.
 
 **Build:**
 
@@ -166,7 +198,7 @@ ctest --preset dev
 ./build/dev/src/cli/rfp-cli --help
 ```
 
-For a Qt‑free build (core + CLI only):
+For a Qt‑free build (core + CLI + crypto only):
 
 ```bash
 cmake --preset core-only
@@ -182,9 +214,10 @@ ctest --preset core-only
 
 - Visual Studio 2022 (with C++ workload)
 - CMake 3.24+
-- Ninja (or use Visual Studio generator)
+- Ninja (or use the Visual Studio generator)
 - Qt 6.8 LTS (installer or `aqtinstall`)
-- vcpkg (for GoogleTest)
+- vcpkg (for GoogleTest **and** OpenSSL)
+- *(only if you intend to build OpenSSL from the submodule)* Perl (Strawberry Perl) and `nmake` from the VS environment
 
 **Setup vcpkg (example):**
 
@@ -193,6 +226,7 @@ git clone https://github.com/microsoft/vcpkg C:\vcpkg
 cd C:\vcpkg
 .\bootstrap-vcpkg.bat
 .\vcpkg install gtest:x64-windows
+.\vcpkg install openssl:x64-windows
 ```
 
 **Configure and build:**
@@ -205,13 +239,19 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
+If vcpkg is not used, CMake will try `find_package(OpenSSL)`. When neither system nor vcpkg OpenSSL is found, the fallback (submodule) will be used — configure it explicitly with:
+
+```powershell
+cmake --preset dev -DRFP_USE_SUBMODULE_OPENSSL=ON
+```
+
 **Run the GUI:**
 
 ```powershell
 .\build\dev\src\gui\Release\rfp-gui.exe
 ```
 
-If you get missing DLL errors, see the section below on how to handle Qt DLLs.
+If you get missing DLL errors, see the section below on how to handle Qt (and OpenSSL) DLLs.
 
 ---
 
@@ -220,10 +260,17 @@ If you get missing DLL errors, see the section below on how to handle Qt DLLs.
 **Install dependencies via Homebrew:**
 
 ```bash
-brew install cmake ninja googletest
+brew install cmake ninja googletest openssl@3
 ```
 
-Install Qt 6.8 LTS separately (using the official installer or `aqtinstall`).  
+Because OpenSSL is keg‑only on macOS, you may need to point CMake at it:
+
+```bash
+export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
+```
+
+Install Qt 6.8 LTS separately (using the official installer or `aqtinstall`).
 Then build as on Linux:
 
 ```bash
@@ -277,18 +324,18 @@ Example self‑test with smart mode:
 
 ---
 
-## Handling Qt DLLs on Windows
+## Handling Qt and OpenSSL DLLs on Windows
 
-When running the GUI on Windows, you may encounter missing Qt DLL errors. To resolve this:
+When running the GUI on Windows, you may encounter missing DLL errors. To resolve this:
 
-1. **Use `windeployqt`** (recommended)  
+1. **Use `windeployqt`** (recommended)
    Open a Qt command prompt or add Qt bin to your PATH, then run:
    ```powershell
    windeployqt.exe build\dev\src\gui\Release\rfp-gui.exe --release --no-translations
    ```
    This copies all required Qt DLLs and plugins into the executable directory.
 
-2. **Manually copy DLLs**  
+2. **Manually copy Qt DLLs**
    Copy the following Qt 6 DLLs from your Qt installation (`bin` folder) to the folder containing `rfp-gui.exe`:
    - `Qt6Core.dll`
    - `Qt6Gui.dll`
@@ -296,7 +343,11 @@ When running the GUI on Windows, you may encounter missing Qt DLL errors. To res
    - `Qt6Concurrent.dll`
    - and the `platforms/qwindows.dll` plugin (placed in a `platforms` subdirectory).
 
-3. **Add Qt bin to `PATH`**  
+3. **OpenSSL DLLs**
+   If you built against a **shared** OpenSSL (the vcpkg default), copy `libcrypto-3-x64.dll` and `libssl-3-x64.dll` next to the executables, or add their directory to `PATH`.
+   If you use `RFP_USE_SUBMODULE_OPENSSL=ON`, OpenSSL is built **statically** (`no-shared`) and no extra DLLs are needed.
+
+4. **Add Qt bin to `PATH`**
    Set the environment variable `PATH=%PATH%;C:\Qt\6.8.0\msvc2022_64\bin` before launching the executable.
 
 The same approach applies if you use other compilers (MinGW, etc.) – adjust paths accordingly.
@@ -308,8 +359,10 @@ The same approach applies if you use other compilers (MinGW, etc.) – adjust pa
 - CMake 3.24+
 - C++20 compiler (GCC 13+, Clang 17+, MSVC 2022)
 - Ninja (or any generator)
-- Qt 6.8 LTS with `Core`, `Gui`, `Widgets`
+- Qt 6.8 LTS with `Core`, `Gui`, `Widgets` (optional — only for the GUI target)
 - GoogleTest (installed as a system package or via vcpkg)
+- **OpenSSL 3.x** (system package, vcpkg, Homebrew, or built from the bundled submodule)
+- On Windows, when building OpenSSL from the submodule: Perl + Visual Studio `nmake`
 
 ---
 
@@ -320,16 +373,21 @@ The same approach applies if you use other compilers (MinGW, etc.) – adjust pa
 ├── .devcontainer/
 ├── .github/workflows/
 ├── cmake/
+│   ├── CompilerWarnings.cmake
+│   ├── OpenSSL.cmake              # OpenSSL integration (system / submodule)
+│   └── ProjectOptions.cmake
 ├── docs/
 ├── examples/
 ├── include/rfp/
 ├── src/
 │   ├── cli/
 │   ├── core/
-│   ├── crypto/
+│   ├── crypto/                    # rfp_crypto — links OpenSSL
 │   ├── gui/
 │   └── stego/
-└── tests/
+├── tests/
+└── third_party/
+    └── openssl/                   # git submodule (optional)
 ```
 
 ---
@@ -351,9 +409,16 @@ The same approach applies if you use other compilers (MinGW, etc.) – adjust pa
 - formatting rules;
 - extraction parameters.
 
-### Stage 3 — Block encryption
+### Stage 3 — Block encryption (in progress)
 
-- pluggable encryption layer;
+- **OpenSSL integrated as the cryptography backend** (submodule + system fallback);
+- pluggable encryption layer inside `rfp_crypto`;
 - algorithm can evolve independently from the steganography module;
-- encryption should be applied before hiding data.
+- encryption is applied **before** hiding data;
+- planned algorithms: AES‑GCM / ChaCha20‑Poly1305 with a user‑supplied key or passphrase (PBKDF2 / Argon2 KDF).
 
+---
+
+## License
+
+See `LICENSE` in the repository root.

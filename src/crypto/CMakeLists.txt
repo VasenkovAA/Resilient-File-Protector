@@ -1,3 +1,5 @@
+include(${PROJECT_SOURCE_DIR}/cmake/OpenSSL.cmake)
+
 add_library(rfp_crypto STATIC
     CryptoPlaceholder.cpp
 )
@@ -15,4 +17,7 @@ target_include_directories(rfp_crypto
 target_link_libraries(rfp_crypto
     PUBLIC
         rfp::core
+    PRIVATE
+        OpenSSL::Crypto
+        OpenSSL::SSL
 )
