@@ -66,8 +66,13 @@ private:
     void saveSettings();
     void showImage(const QImage &image, bool fit = true);
     void setStatus(const QString &text, int timeout = 0);
-    void setProgress(int value, int maximum = 0);
     void updateStats(const QString &text);
+
+    // --- Индикатор занятости ---
+    void beginBusy(const QString &message);
+    void endBusy();
+    int  busyCounter_ = 0;
+
     void runEmbed(const QString &input, const QString &output, const QByteArray &data);
     void runExtract(const QString &input, size_t payloadSize);
     void runMasking(const QString &dir, const QString &ext, int count,
@@ -79,7 +84,7 @@ private:
     [[nodiscard]] rfp::stego::StegoParams collectParams(bool forExtract = false) const;
     [[nodiscard]] QImage imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const;
 
-    // ---- Статические помощники: вызываются из фонового потока, без this ----
+    // Статические помощники — безопасны в фоновом потоке
     static QImage generateDispersionOverlay(const rfp::stego::ImageBuffer &buffer,
                                             const rfp::stego::StegoParams &params,
                                             int overlayOpacity,
@@ -144,7 +149,7 @@ private:
     QGraphicsScene *previewScene_ = nullptr;
     QLabel *miniPreviewLabel_ = nullptr;
     QLabel *statsLabel_ = nullptr;
-    QProgressBar *progressBar_ = nullptr;
+    QProgressBar *progressBar_ = nullptr;   // теперь — индикатор занятости
     QLabel *statusLabel_ = nullptr;
     QPushButton *settingsButton_ = nullptr;
     QPushButton *maskingButton_ = nullptr;
@@ -170,6 +175,7 @@ private:
     QFutureWatcher<rfp::core::Result<rfp::core::ByteBuffer>> extractWatcher_;
     QFutureWatcher<void> maskingWatcher_;
     QFutureWatcher<RecomputeResult> previewWatcher_;
+    QFutureWatcher<double> autoThresholdWatcher_;
     bool embedding_ = false, extracting_ = false;
 
     bool recomputeInProgress_ = false;

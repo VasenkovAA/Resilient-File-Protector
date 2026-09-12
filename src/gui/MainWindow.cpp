@@ -415,11 +415,18 @@ void MainWindow::setupUi() {
 
     mainLayout->addWidget(tabWidget_);
 
+        // Статусбар: слева — текст, справа — индикатор занятости
+    statusLabel_ = new QLabel(tr("Ready"), this);
+    statusLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    statusLabel_->setMinimumWidth(300);
+    statusBar()->addWidget(statusLabel_, 1);
+
     progressBar_ = new QProgressBar(this);
+    progressBar_->setRange(0, 0);          // неопределённый режим
+    progressBar_->setTextVisible(false);
+    progressBar_->setFixedWidth(160);
     progressBar_->setVisible(false);
-    statusBar()->addWidget(progressBar_, 1);
-    statusLabel_ = new QLabel(this);
-    statusBar()->addWidget(statusLabel_);
+    statusBar()->addPermanentWidget(progressBar_);
 
     setCentralWidget(central);
 }
@@ -456,25 +463,52 @@ void MainWindow::setupConnections() {
     connect(fullscreenButton_, &QPushButton::clicked, this, &MainWindow::onFullscreen);
     connect(helpButton_, &QPushButton::clicked, this, &MainWindow::showHelp);
 
+        // Авто-порог для embed — считаем в фоне
     connect(embedAutoThresholdBtn_, &QPushButton::clicked, this, [this]() {
         if (!currentImage_) {
             QMessageBox::warning(this, tr("R.F.P."), tr("Load an input image first."));
             return;
         }
         auto params = collectParams(false);
-        double thr = computeAutoThreshold(currentImage_.value(), params);
-        embedThresholdEdit_->setText(QString::number(thr, 'f', 2));
-        scheduleUpdate();
+        auto imageCopy = currentImage_.value();
+        beginBusy(tr("Computing threshold (Embed)..."));
+
+        auto *watcher = new QFutureWatcher<double>(this);
+        connect(watcher, &QFutureWatcher<double>::finished, this, [this, watcher]() {
+            const double thr = watcher->result();
+            embedThresholdEdit_->setText(QString::number(thr, 'f', 2));
+            watcher->deleteLater();
+            endBusy();
+            setStatus(tr("Auto threshold: %1").arg(thr, 0, 'f', 2), 3000);
+            scheduleUpdate();
+        });
+        watcher->setFuture(QtConcurrent::run([imageCopy, params]() {
+            return computeAutoThreshold(imageCopy, params);
+        }));
     });
+
+    // Авто-порог для extract
     connect(extractAutoThresholdBtn_, &QPushButton::clicked, this, [this]() {
         if (!currentImage_) {
             QMessageBox::warning(this, tr("R.F.P."), tr("Load an input image first."));
             return;
         }
         auto params = collectParams(true);
-        double thr = computeAutoThreshold(currentImage_.value(), params);
-        extractThresholdEdit_->setText(QString::number(thr, 'f', 2));
-        scheduleUpdate();
+        auto imageCopy = currentImage_.value();
+        beginBusy(tr("Computing threshold (Extract)..."));
+
+        auto *watcher = new QFutureWatcher<double>(this);
+        connect(watcher, &QFutureWatcher<double>::finished, this, [this, watcher]() {
+            const double thr = watcher->result();
+            extractThresholdEdit_->setText(QString::number(thr, 'f', 2));
+            watcher->deleteLater();
+            endBusy();
+            setStatus(tr("Auto threshold: %1").arg(thr, 0, 'f', 2), 3000);
+            scheduleUpdate();
+        });
+        watcher->setFuture(QtConcurrent::run([imageCopy, params]() {
+            return computeAutoThreshold(imageCopy, params);
+        }));
     });
 
     auto *copyEmbedBtn = findChild<QPushButton *>("copyEmbedBtn");
@@ -742,7 +776,9 @@ void MainWindow::browseInputImage() {
         tr("Images (*.png *.bmp *.tif *.tiff);;All files (*.*)"));
     if (path.isEmpty()) return;
     inputImageEdit_->setText(path);
-    setStatus(tr("Loading image..."));
+
+    beginBusy(tr("Loading image..."));
+
     QFuture<void> future = QtConcurrent::run([this, path]() {
         auto result = rfp::gui::loadImageBuffer(path);
         QMetaObject::invokeMethod(this, [this, result, path]() {
@@ -753,16 +789,18 @@ void MainWindow::browseInputImage() {
                 modifiedQImage_.reset();
                 updateMiniPreview();
                 showImage(currentQImage_.value());
-                setStatus(tr("Loaded: %1").arg(path));
                 updateStats(tr("Resolution: %1×%2, Channels: %3")
                                 .arg(currentImage_->width)
                                 .arg(currentImage_->height)
                                 .arg(currentImage_->channels));
+                endBusy();
+                setStatus(tr("Loaded: %1").arg(path), 4000);
                 scheduleUpdate();
             } else {
+                endBusy();
                 QMessageBox::warning(this, tr("R.F.P."),
                                      QString::fromStdString(result.error().message));
-                setStatus(tr("Error loading image"));
+                setStatus(tr("Error loading image"), 5000);
             }
         });
     });
@@ -802,8 +840,7 @@ void MainWindow::embedText() {
                                  .arg(capacity));
         return;
     }
-    setStatus(tr("Embedding..."));
-    setProgress(0, 0);
+    beginBusy(tr("Embedding..."));
     embedding_ = true;
     runEmbed(inputImageEdit_->text(), outputImageEdit_->text(), utf8);
 }
@@ -837,18 +874,21 @@ void MainWindow::onEmbedFinished() {
     embedding_ = false;
     auto result = embedWatcher_.result();
     if (!result) {
+        endBusy();
         QMessageBox::warning(this, tr("R.F.P."), QString::fromStdString(result.error().message));
-        setStatus(tr("Embedding failed"));
-        setProgress(0, 0);
+        setStatus(tr("Embedding failed"), 5000);
         return;
     }
     modifiedImage_ = result.value();
     modifiedQImage_ = imageBufferToQImage(modifiedImage_.value());
 
+    beginBusy(tr("Saving image..."));
+
     auto saveResult = rfp::gui::saveImageBuffer(modifiedImage_.value(), outputImageEdit_->text());
     if (!saveResult) {
+        endBusy();
         QMessageBox::warning(this, tr("R.F.P."), QString::fromStdString(saveResult.error().message));
-        setStatus(tr("Save failed"));
+        setStatus(tr("Save failed"), 5000);
         return;
     }
 
@@ -860,12 +900,12 @@ void MainWindow::onEmbedFinished() {
     auto crc = rfp::core::crc32(std::span<const rfp::core::Byte>(
         reinterpret_cast<const rfp::core::Byte *>(originalData.constData()),
         static_cast<size_t>(originalData.size())));
+
+    endBusy();
     setStatus(tr("Embedded %1 bytes. CRC32: %2")
                   .arg(originalData.size())
-                  .arg(crcToText(crc)));
-
+                  .arg(crcToText(crc)), 8000);
     scheduleUpdate();
-    setProgress(0, 0);
 }
 
 void MainWindow::extractText() {
@@ -874,7 +914,7 @@ void MainWindow::extractText() {
         QMessageBox::warning(this, tr("R.F.P."), tr("Specify input image path."));
         return;
     }
-    setStatus(tr("Extracting..."));
+    beginBusy(tr("Extracting..."));
     extracting_ = true;
     size_t payloadSize = 0;
     if (writeHeader_ && autoDetectSizeCheck_->isChecked()) {
@@ -919,8 +959,9 @@ void MainWindow::onExtractFinished() {
     extracting_ = false;
     auto result = extractWatcher_.result();
     if (!result) {
+        endBusy();
         QMessageBox::warning(this, tr("R.F.P."), QString::fromStdString(result.error().message));
-        setStatus(tr("Extraction failed"));
+        setStatus(tr("Extraction failed"), 5000);
         return;
     }
     const auto &data = result.value();
@@ -928,9 +969,9 @@ void MainWindow::onExtractFinished() {
                             static_cast<qsizetype>(data.size()));
     extractedTextEdit_->setPlainText(QString::fromUtf8(decodedBytes));
     auto crc = rfp::core::crc32(std::span<const rfp::core::Byte>(data.data(), data.size()));
-    setStatus(tr("Extracted %1 bytes. CRC32: %2").arg(data.size()).arg(crcToText(crc)));
     updateStats(tr("Extracted %1 bytes").arg(data.size()));
-    setProgress(0, 0);
+    endBusy();
+    setStatus(tr("Extracted %1 bytes. CRC32: %2").arg(data.size()).arg(crcToText(crc)), 8000);
 }
 
 void MainWindow::onTextChanged() {
@@ -950,8 +991,8 @@ void MainWindow::doUpdate() {
 
     if (!currentImage_) {
         if (capacityLabel_) capacityLabel_->setText(tr("Capacity: not loaded"));
-        if (usageLabel_) usageLabel_->setText(tr("Usage: no image"));
-        if (previewScene_) previewScene_->clear();
+        if (usageLabel_)    usageLabel_->setText(tr("Usage: no image"));
+        if (previewScene_)  previewScene_->clear();
         return;
     }
 
@@ -960,7 +1001,6 @@ void MainWindow::doUpdate() {
         return;
     }
 
-    // Снимок всего нужного в главном потоке
     const rfp::stego::StegoParams params = collectParams(false);
     const QString payloadText = payloadEdit_->toPlainText();
     const bool showPreview  = showPreview_;
@@ -974,7 +1014,7 @@ void MainWindow::doUpdate() {
     const bool hasModified  = modifiedQImage_.has_value();
 
     recomputeInProgress_ = true;
-    if (statusLabel_) statusLabel_->setText(tr("Computing..."));
+    beginBusy(tr("Computing capacity and preview..."));
 
     auto future = QtConcurrent::run(
         [params, payloadText, showPreview, previewMode, overlayOp,
@@ -982,7 +1022,6 @@ void MainWindow::doUpdate() {
 
         RecomputeResult res;
 
-        // 1. Ёмкость
         const size_t capacity     = rfp::stego::capacityBytes(imageCopy, params);
         const size_t capacityBits = rfp::stego::capacityBits(imageCopy, params);
 
@@ -998,7 +1037,6 @@ void MainWindow::doUpdate() {
         }
         res.capacityText = info;
 
-        // 2. Использование
         const QByteArray utf8 = payloadText.toUtf8();
         const size_t used = static_cast<size_t>(utf8.size()) + (writeHdr ? 4 : 0);
         if (capacity == 0) {
@@ -1010,7 +1048,6 @@ void MainWindow::doUpdate() {
                                 .arg(color).arg(used).arg(capacity).arg(percent, 0, 'f', 1);
         }
 
-        // 3. Предпросмотр
         if (!showPreview) return res;
 
         if (previewMode == 0) {
@@ -1024,10 +1061,8 @@ void MainWindow::doUpdate() {
 
         if (previewMode == 1) {
             double minVal = 0, maxVal = 0, meanVal = 0;
-            // static-метод, без this
             const QImage overlay = MainWindow::generateDispersionOverlay(
                 imageCopy, params, overlayOp, minVal, maxVal, meanVal);
-
             QImage result = curQImg;
             if (!overlay.isNull()) {
                 QPainter painter(&result);
@@ -1093,12 +1128,17 @@ void MainWindow::onPreviewReady() {
         if (previewScene_) previewScene_->clear();
         updateStats("");
     }
-    if (statusLabel_) statusLabel_->setText(tr("Ready"));
 
+    // Если во время вычисления пришёл новый запрос — НЕ скрываем busy,
+    // сразу запускаем следующий расчёт.
     if (recomputePending_) {
         recomputePending_ = false;
         QTimer::singleShot(0, this, &MainWindow::doUpdate);
+        return;
     }
+
+    endBusy();
+    setStatus(tr("Ready"), 2000);
 }
 
 // ============================================================================
@@ -1502,17 +1542,26 @@ void MainWindow::setStatus(const QString &text, int timeout) {
             if (statusLabel_) statusLabel_->clear();
         });
 }
-
-void MainWindow::setProgress(int value, int maximum) {
-    if (!progressBar_) return;
-    if (maximum <= 0) {
-        progressBar_->setVisible(false);
-        return;
+void MainWindow::beginBusy(const QString &message) {
+    ++busyCounter_;
+    if (progressBar_) {
+        progressBar_->setRange(0, 0);
+        progressBar_->setVisible(true);
     }
-    progressBar_->setVisible(true);
-    progressBar_->setRange(0, maximum);
-    progressBar_->setValue(value);
+    if (statusLabel_) {
+        statusLabel_->setText(message);
+    }
 }
+
+void MainWindow::endBusy() {
+    if (busyCounter_ > 0)
+        --busyCounter_;
+    if (busyCounter_ == 0 && progressBar_) {
+        progressBar_->setVisible(false);
+    }
+}
+
+
 
 void MainWindow::updateStats(const QString &text) {
     if (!statsLabel_) return;
@@ -1577,7 +1626,7 @@ void MainWindow::showHelp() {
 
 void MainWindow::runMasking(const QString &dir, const QString &ext, int count,
                             bool recursive, const QString &exclude) {
-    setStatus(tr("Masking..."));
+    beginBusy(tr("Masking..."));
     auto future = QtConcurrent::run([dir, ext, count, recursive, exclude]() {
         QDir directory(dir);
         if (!directory.exists()) return;
@@ -1599,7 +1648,8 @@ void MainWindow::runMasking(const QString &dir, const QString &ext, int count,
     });
     maskingWatcher_.setFuture(future);
     connect(&maskingWatcher_, &QFutureWatcher<void>::finished, this, [this]() {
-        setStatus(tr("Masking completed"));
+        endBusy();
+        setStatus(tr("Masking completed"), 4000);
         if (maskingDialog_)
             maskingDialog_->appendLog(tr("Masking completed."));
     });
