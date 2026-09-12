@@ -11,6 +11,7 @@
 #include "rfp/stego/StegoEncoder.h"
 #include "rfp/stego/StegoSlots.h"
 #include <QSignalBlocker>
+#include <QDialog>
 
 #include <QApplication>
 #include <QClipboard>
@@ -1569,11 +1570,35 @@ void MainWindow::updateStats(const QString &text) {
 }
 
 void MainWindow::onFullscreen() {
-    if (!previewView_) return;
-    if (previewView_->isFullScreen())
-        previewView_->setWindowState(Qt::WindowNoState);
-    else
-        previewView_->setWindowState(Qt::WindowFullScreen);
+    if (!previewScene_) return;
+
+    // Открываем модальное top-level окно на весь экран с той же сценой.
+    auto *dlg = new QDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowTitle(tr("Preview"));
+    dlg->setStyleSheet("background-color: black;");
+
+    auto *view = new QGraphicsView(dlg);
+    view->setScene(previewScene_);
+    view->setRenderHint(QPainter::Antialiasing);
+    view->setBackgroundBrush(Qt::black);
+    view->setAlignment(Qt::AlignCenter);
+    view->setDragMode(QGraphicsView::ScrollHandDrag);
+    view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    view->setResizeAnchor(QGraphicsView::AnchorUnderMouse);
+    view->setFrameShape(QFrame::NoFrame);
+
+    auto *layout = new QVBoxLayout(dlg);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(view);
+
+    // Показать на весь экран и вписать картинку
+    dlg->showFullScreen();
+    if (previewScene_->itemsBoundingRect().isValid())
+        view->fitInView(previewScene_->itemsBoundingRect(), Qt::KeepAspectRatio);
+
+    // Небольшая задержка: покажем подсказку, что Esc закрывает окно
+    setStatus(tr("Fullscreen: press Esc to exit"), 3000);
 }
 
 void MainWindow::showSettings() {
