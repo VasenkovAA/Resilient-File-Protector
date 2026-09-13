@@ -275,14 +275,6 @@ Reports land in `build/cov/coverage/` (`coverage.txt`, `index.html`, `coverage.x
 
 ---
 
-## Roadmap
-
-- **Stage 1 — Image steganography** *(done)* — PNG raster hiding, CRC32 integrity, GUI workflow, smart slot selection.
-- **Stage 2 — Source‑code‑like masking** *(planned)* — payload represented as ordinary‑looking source code.
-- **Stage 3 — Block encryption** *(in progress)* — OpenSSL backend, pluggable cipher layer applied **before** hiding; AES‑GCM / ChaCha20‑Poly1305 with passphrase or key (PBKDF2 / Argon2).
-
----
-
 ## License
 
 See [`LICENSE`](LICENSE).
