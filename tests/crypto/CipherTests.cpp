@@ -10,8 +10,7 @@ using namespace rfp::crypto::test;
 
 namespace {
 
-[[maybe_unused]] CipherParams makeParams(CipherId id,
-                        const ByteBuffer& key,
+CipherParams makeParams(const ByteBuffer& key,
                         const ByteBuffer& iv,
                         const ByteBuffer& aad = {},
                         const ByteBuffer& tag = {}) {
@@ -39,7 +38,7 @@ TEST(CipherTests, Aes128Gcm_TestCase1_EmptyPlaintext) {
     auto iv  = fromHex("000000000000000000000000");
     auto pt  = ByteBuffer{};
 
-    auto r = Cipher::encrypt(CipherId::Aes128Gcm, makeParams(CipherId::Aes128Gcm, key, iv), pt);
+    auto r = Cipher::encrypt(CipherId::Aes128Gcm, makeParams(key, iv), pt);
     ASSERT_TRUE(r) << r.error().message;
     EXPECT_TRUE(r->ciphertext.empty());
     EXPECT_EQ(toHex(r->tag), "58e2fccefa7e3061367f1d57a4e7455a");
@@ -51,7 +50,7 @@ TEST(CipherTests, Aes128Gcm_TestCase2_16BytePlaintext) {
     auto iv  = fromHex("000000000000000000000000");
     auto pt  = fromHex("00000000000000000000000000000000");
 
-    auto r = Cipher::encrypt(CipherId::Aes128Gcm, makeParams(CipherId::Aes128Gcm, key, iv), pt);
+    auto r = Cipher::encrypt(CipherId::Aes128Gcm, makeParams(key, iv), pt);
     ASSERT_TRUE(r) << r.error().message;
     EXPECT_EQ(toHex(r->ciphertext), "0388dace60b6a392f328c2b971b2fe78");
     EXPECT_EQ(toHex(r->tag),        "ab6e47d42cec13bdf53a67b21257bddf");
@@ -68,7 +67,7 @@ TEST(CipherTests, Aes128Gcm_TestCase4_WithAad) {
                        "1c3c0c95956809532fcf0e2449a6b525"
                        "b16aedf5aa0de657ba637b39");
 
-    auto params = makeParams(CipherId::Aes128Gcm, key, iv, aad);
+    auto params = makeParams(key, iv, aad);
     auto r = Cipher::encrypt(CipherId::Aes128Gcm, params, pt);
     ASSERT_TRUE(r) << r.error().message;
 
@@ -79,7 +78,7 @@ TEST(CipherTests, Aes128Gcm_TestCase4_WithAad) {
               "1ba30b396a0aac973d58e091");
     EXPECT_EQ(toHex(r->tag), "5bc94fbc3221a5db94fae95ae7121a47");
 
-    auto dp = makeParams(CipherId::Aes128Gcm, key, iv, aad, r->tag);
+    auto dp = makeParams(key, iv, aad, r->tag);
     auto d = Cipher::decrypt(CipherId::Aes128Gcm, dp, r->ciphertext);
     ASSERT_TRUE(d) << d.error().message;
     EXPECT_EQ(d.value(), pt);
@@ -94,7 +93,7 @@ TEST(CipherTests, Aes128Gcm_TestCase5_WithoutAad) {
                        "b16aedf5aa0de657ba637b391aafd255");
 
     auto r = Cipher::encrypt(CipherId::Aes128Gcm,
-                             makeParams(CipherId::Aes128Gcm, key, iv), pt);
+                             makeParams(key, iv), pt);
     ASSERT_TRUE(r) << r.error().message;
 
     EXPECT_EQ(toHex(r->ciphertext),
@@ -111,7 +110,7 @@ TEST(CipherTests, Aes256Gcm_TestCase13_EmptyPlaintext) {
     auto iv  = fromHex("000000000000000000000000");
 
     auto r = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, key, iv), {});
+                             makeParams(key, iv), {});
     ASSERT_TRUE(r) << r.error().message;
     EXPECT_EQ(toHex(r->tag), "530f8afbc74536b9a963b4f1c4cb738b");
 }
@@ -123,7 +122,7 @@ TEST(CipherTests, Aes256Gcm_TestCase14_16BytePlaintext) {
     auto pt  = fromHex("00000000000000000000000000000000");
 
     auto r = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, key, iv), pt);
+                             makeParams(key, iv), pt);
     ASSERT_TRUE(r) << r.error().message;
     EXPECT_EQ(toHex(r->ciphertext), "cea7403d4d606b6e074ec5d3baf39d18");
     EXPECT_EQ(toHex(r->tag),        "d0d1c8a799996bf0265b98b5d48ab919");
@@ -138,7 +137,7 @@ TEST(CipherTests, ChaCha20Poly1305_Rfc8439) {
     auto pt    = bytesOf("Ladies and Gentlemen of the class of '99: If I could "
                          "offer you only one tip for the future, sunscreen would be it.");
 
-    auto params = makeParams(CipherId::ChaCha20Poly1305, key, nonce, aad);
+    auto params = makeParams(key, nonce, aad);
     auto r = Cipher::encrypt(CipherId::ChaCha20Poly1305, params, pt);
     ASSERT_TRUE(r) << r.error().message;
 
@@ -167,11 +166,11 @@ TEST_P(CipherRoundTrip, EncryptDecrypt) {
     auto iv  = Random::bytes(spec.ivSize).value();
     auto pt  = bytesOf("The quick brown fox jumps over the lazy dog. 1234567890");
 
-    auto params = makeParams(id, key, iv);
+    auto params = makeParams(key, iv);
     auto enc = Cipher::encrypt(id, params, pt);
     ASSERT_TRUE(enc) << nameOf(id) << ": " << enc.error().message;
 
-    auto dp = makeParams(id, key, enc->iv, {}, enc->tag);
+    auto dp = makeParams(key, enc->iv, {}, enc->tag);
     auto dec = Cipher::decrypt(id, dp, enc->ciphertext);
     ASSERT_TRUE(dec) << nameOf(id) << ": " << dec.error().message;
     EXPECT_EQ(dec.value(), pt);
@@ -193,8 +192,8 @@ TEST(CipherTests, DifferentKeyProducesDifferentCiphertext) {
 
     auto k1 = zeros(32); auto k2 = zeros(32); k2[0] = 0xFF;
 
-    auto e1 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(CipherId::Aes256Gcm, k1, iv), pt);
-    auto e2 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(CipherId::Aes256Gcm, k2, iv), pt);
+    auto e1 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(k1, iv), pt);
+    auto e2 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(k2, iv), pt);
     ASSERT_TRUE(e1 && e2);
     EXPECT_NE(e1->ciphertext, e2->ciphertext);
     EXPECT_NE(e1->tag,        e2->tag);
@@ -205,8 +204,8 @@ TEST(CipherTests, DifferentIvProducesDifferentCiphertext) {
     auto i1 = zeros(12); auto i2 = zeros(12); i2[0] = 1;
     auto pt = bytesOf("deterministic");
 
-    auto e1 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(CipherId::Aes256Gcm, k, i1), pt);
-    auto e2 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(CipherId::Aes256Gcm, k, i2), pt);
+    auto e1 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(k, i1), pt);
+    auto e2 = Cipher::encrypt(CipherId::Aes256Gcm, makeParams(k, i2), pt);
     ASSERT_TRUE(e1 && e2);
     EXPECT_NE(e1->ciphertext, e2->ciphertext);
 }
@@ -219,9 +218,9 @@ TEST(CipherTests, DifferentAadProducesDifferentTag) {
     auto aad2 = bytesOf("AAD-2");
 
     auto e1 = Cipher::encrypt(CipherId::Aes256Gcm,
-                              makeParams(CipherId::Aes256Gcm, k, iv, aad1), pt);
+                              makeParams(k, iv, aad1), pt);
     auto e2 = Cipher::encrypt(CipherId::Aes256Gcm,
-                              makeParams(CipherId::Aes256Gcm, k, iv, aad2), pt);
+                              makeParams(k, iv, aad2), pt);
     ASSERT_TRUE(e1 && e2);
     EXPECT_EQ(e1->ciphertext, e2->ciphertext);   // AAD не влияет на CT для GCM
     EXPECT_NE(e1->tag,        e2->tag);          // но влияет на tag
@@ -245,10 +244,10 @@ TEST(CipherTests, EmptyIvIsAutoGenerated) {
 
     // Оба варианта должны корректно расшифровываться
     auto d1 = Cipher::decrypt(CipherId::Aes256Gcm,
-                              makeParams(CipherId::Aes256Gcm, k, e1->iv, {}, e1->tag),
+                              makeParams(k, e1->iv, {}, e1->tag),
                               e1->ciphertext);
     auto d2 = Cipher::decrypt(CipherId::Aes256Gcm,
-                              makeParams(CipherId::Aes256Gcm, k, e2->iv, {}, e2->tag),
+                              makeParams(k, e2->iv, {}, e2->tag),
                               e2->ciphertext);
     EXPECT_EQ(d1.value(), pt);
     EXPECT_EQ(d2.value(), pt);
@@ -292,7 +291,7 @@ TEST(CipherTests, WrongTagSizeRejectedOnDecrypt) {
     auto k = zeros(32);
     auto iv = zeros(12);
     auto e = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv),
+                             makeParams(k, iv),
                              bytesOf("test"));
     ASSERT_TRUE(e);
 
@@ -314,13 +313,13 @@ TEST(CipherTests, TamperedCiphertextFailsAead) {
     auto pt = bytesOf("authentic");
 
     auto e = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv), pt);
+                             makeParams(k, iv), pt);
     ASSERT_TRUE(e);
 
     auto ct = e->ciphertext; ct[0] ^= 0x01;
 
     auto d = Cipher::decrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv, {}, e->tag), ct);
+                             makeParams(k, iv, {}, e->tag), ct);
     ASSERT_FALSE(d);
     EXPECT_EQ(d.error().code, rfp::core::ErrorCode::DecodeError);
 }
@@ -330,14 +329,14 @@ TEST(CipherTests, TamperedTagFailsAead) {
     auto iv = zeros(12);
 
     auto e = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv),
+                             makeParams(k, iv),
                              bytesOf("authentic"));
     ASSERT_TRUE(e);
 
     auto tag = e->tag; tag[0] ^= 0x01;
 
     auto d = Cipher::decrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv, {}, tag),
+                             makeParams(k, iv, {}, tag),
                              e->ciphertext);
     ASSERT_FALSE(d);
     EXPECT_EQ(d.error().code, rfp::core::ErrorCode::DecodeError);
@@ -349,13 +348,13 @@ TEST(CipherTests, TamperedAadFailsAead) {
     auto aad = bytesOf("original-aad");
 
     auto e = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv, aad),
+                             makeParams(k, iv, aad),
                              bytesOf("authentic"));
     ASSERT_TRUE(e);
 
     auto badAad = bytesOf("tampered-aad");
     auto d = Cipher::decrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k, iv, badAad, e->tag),
+                             makeParams(k, iv, badAad, e->tag),
                              e->ciphertext);
     ASSERT_FALSE(d);
     EXPECT_EQ(d.error().code, rfp::core::ErrorCode::DecodeError);
@@ -367,12 +366,12 @@ TEST(CipherTests, WrongKeyFailsAeadDecryption) {
     auto iv = zeros(12);
 
     auto e = Cipher::encrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k1, iv),
+                             makeParams(k1, iv),
                              bytesOf("secret"));
     ASSERT_TRUE(e);
 
     auto d = Cipher::decrypt(CipherId::Aes256Gcm,
-                             makeParams(CipherId::Aes256Gcm, k2, iv, {}, e->tag),
+                             makeParams(k2, iv, {}, e->tag),
                              e->ciphertext);
     ASSERT_FALSE(d);
     EXPECT_EQ(d.error().code, rfp::core::ErrorCode::DecodeError);
@@ -387,12 +386,12 @@ TEST(CipherTests, Aes256CbcLongerThanBlock) {
     auto pt = bytesOf(std::string(100, 'A'));
 
     auto e = Cipher::encrypt(CipherId::Aes256Cbc,
-                             makeParams(CipherId::Aes256Cbc, k, iv), pt);
+                             makeParams(k, iv), pt);
     ASSERT_TRUE(e);
     EXPECT_TRUE(e->tag.empty());
 
     auto d = Cipher::decrypt(CipherId::Aes256Cbc,
-                             makeParams(CipherId::Aes256Cbc, k, iv),
+                             makeParams(k, iv),
                              e->ciphertext);
     ASSERT_TRUE(d);
     EXPECT_EQ(d.value(), pt);
@@ -403,12 +402,12 @@ TEST(CipherTests, Aes256CtrEmptyPlaintext) {
     auto iv = zeros(16);
 
     auto e = Cipher::encrypt(CipherId::Aes256Ctr,
-                             makeParams(CipherId::Aes256Ctr, k, iv), {});
+                             makeParams(k, iv), {});
     ASSERT_TRUE(e);
     EXPECT_TRUE(e->ciphertext.empty());
 
     auto d = Cipher::decrypt(CipherId::Aes256Ctr,
-                             makeParams(CipherId::Aes256Ctr, k, iv),
+                             makeParams(k, iv),
                              e->ciphertext);
     ASSERT_TRUE(d);
     EXPECT_TRUE(d->empty());
@@ -423,11 +422,11 @@ TEST(CipherTests, ChaCha20RoundTripNoAad) {
     auto pt = bytesOf("no aad here");
 
     auto e = Cipher::encrypt(CipherId::ChaCha20Poly1305,
-                             makeParams(CipherId::ChaCha20Poly1305, k, iv), pt);
+                             makeParams(k, iv), pt);
     ASSERT_TRUE(e);
 
     auto d = Cipher::decrypt(CipherId::ChaCha20Poly1305,
-                             makeParams(CipherId::ChaCha20Poly1305, k, iv, {}, e->tag),
+                             makeParams(k, iv, {}, e->tag),
                              e->ciphertext);
     ASSERT_TRUE(d);
     EXPECT_EQ(d.value(), pt);

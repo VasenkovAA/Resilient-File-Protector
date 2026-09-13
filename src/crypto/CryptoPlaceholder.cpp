@@ -6,9 +6,10 @@ namespace rfp::crypto {
 
 rfp::core::Error moduleStatus()
 {
+    // OPENSSL_VERSION_TEXT already starts with "OpenSSL" — don't duplicate it.
     return rfp::core::Error{
         rfp::core::ErrorCode::None,
-        std::string("OpenSSL ") + OPENSSL_VERSION_TEXT
+        std::string(OPENSSL_VERSION_TEXT)
     };
 }
 
