@@ -17,6 +17,8 @@ add_executable(rfp-gui
     main.cpp
     MainWindow.cpp
     MainWindow.h
+    CryptoPanel.cpp
+    CryptoPanel.h
     QtImageAdapter.cpp
     QtImageAdapter.h
     HelpDialog.cpp
@@ -37,6 +39,7 @@ target_link_libraries(rfp-gui
         rfp::core
         rfp::stego
         rfp::crypto
+        rfp::payload
 )
 
 set_target_properties(rfp-gui PROPERTIES

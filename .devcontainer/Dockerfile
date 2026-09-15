@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb-xinerama0 \
     libxcb-xinput0 \
     libgtest-dev \
+    libpng-dev \
     git \
     ca-certificates \
     sudo \

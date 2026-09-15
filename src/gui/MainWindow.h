@@ -16,6 +16,8 @@
 #include <QTabWidget>
 #include <QTimer>
 
+#include "rfp/crypto/CryptoTypes.h"
+#include "rfp/payload/PayloadCrypto.h"
 #include "rfp/stego/ImageBuffer.h"
 #include "rfp/stego/StegoParams.h"
 #include <optional>
@@ -24,6 +26,7 @@
 class SettingsDialog;
 class MaskingDialog;
 class HelpDialog;
+class CryptoPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -56,6 +59,9 @@ private slots:
     void copyExtractParams();
     void pasteExtractParams();
 
+    void onEmbedCryptoChanged();
+    void onExtractCryptoChanged();
+
     void doUpdate();
     void onPreviewReady();
 
@@ -68,13 +74,12 @@ private:
     void setStatus(const QString &text, int timeout = 0);
     void updateStats(const QString &text);
 
-    // --- Индикатор занятости ---
     void beginBusy(const QString &message);
     void endBusy();
     int  busyCounter_ = 0;
 
     void runEmbed(const QString &input, const QString &output, const QByteArray &data);
-    void runExtract(const QString &input, size_t payloadSize);
+    void runExtract(const QString &input);
     void runMasking(const QString &dir, const QString &ext, int count,
                     bool recursive, const QString &exclude);
     void updateMiniPreview();
@@ -82,9 +87,10 @@ private:
     void scheduleUpdate();
 
     [[nodiscard]] rfp::stego::StegoParams collectParams(bool forExtract = false) const;
+    [[nodiscard]] rfp::payload::EncryptParams
+        collectEncryptParams(const QString& password) const;
     [[nodiscard]] QImage imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const;
 
-    // Статические помощники — безопасны в фоновом потоке
     static QImage generateDispersionOverlay(const rfp::stego::ImageBuffer &buffer,
                                             const rfp::stego::StegoParams &params,
                                             int overlayOpacity,
@@ -94,13 +100,15 @@ private:
     static QImage generateChangesMask(const QImage &original, const QImage &modified);
     static QColor dispersionToColor(double value, double minVal, double maxVal);
 
+    static std::size_t cryptoOverheadBytes(rfp::crypto::CipherId id) noexcept;
+
     [[nodiscard]] QString serializeFull(const rfp::stego::StegoParams &params,
                                         const QString &inputPath,
                                         const QString &outputPath) const;
     [[nodiscard]] bool deserializeFull(const QString &str,
                                        rfp::stego::StegoParams &params,
                                        QString &inputPath,
-                                       QString &outputPath) const;
+                                       QString &outputPath);
 
     struct RecomputeResult {
         QString capacityText;
@@ -129,6 +137,8 @@ private:
     QPushButton *embedAutoThresholdBtn_ = nullptr;
     QCheckBox *embedShuffleCheck_ = nullptr;
 
+    CryptoPanel *embedCryptoPanel_ = nullptr;
+
     QSpinBox *extractBitsSpin_ = nullptr;
     QSpinBox *extractSeedSpin_ = nullptr;
     QCheckBox *extractRed_ = nullptr, *extractGreen_ = nullptr, *extractBlue_ = nullptr, *extractAlpha_ = nullptr;
@@ -138,6 +148,8 @@ private:
     QLineEdit *extractThresholdEdit_ = nullptr;
     QPushButton *extractAutoThresholdBtn_ = nullptr;
     QCheckBox *extractShuffleCheck_ = nullptr;
+
+    CryptoPanel *extractCryptoPanel_ = nullptr;
 
     QWidget *extractTab_ = nullptr;
     QLineEdit *inputImageExtractEdit_ = nullptr;
@@ -149,7 +161,7 @@ private:
     QGraphicsScene *previewScene_ = nullptr;
     QLabel *miniPreviewLabel_ = nullptr;
     QLabel *statsLabel_ = nullptr;
-    QProgressBar *progressBar_ = nullptr;   // теперь — индикатор занятости
+    QProgressBar *progressBar_ = nullptr;
     QLabel *statusLabel_ = nullptr;
     QPushButton *settingsButton_ = nullptr;
     QPushButton *maskingButton_ = nullptr;
@@ -175,7 +187,6 @@ private:
     QFutureWatcher<rfp::core::Result<rfp::core::ByteBuffer>> extractWatcher_;
     QFutureWatcher<void> maskingWatcher_;
     QFutureWatcher<RecomputeResult> previewWatcher_;
-    QFutureWatcher<double> autoThresholdWatcher_;
     bool embedding_ = false, extracting_ = false;
 
     bool recomputeInProgress_ = false;

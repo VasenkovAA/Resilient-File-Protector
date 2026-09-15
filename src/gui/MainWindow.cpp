@@ -1,10 +1,13 @@
 #include "MainWindow.h"
+#include "CryptoPanel.h"
 #include "HelpDialog.h"
 #include "MaskingDialog.h"
 #include "QtImageAdapter.h"
 #include "SettingsDialog.h"
 #include "rfp/core/ByteBuffer.h"
 #include "rfp/core/Crc32.h"
+#include "rfp/crypto/CryptoRegistry.h"
+#include "rfp/payload/PayloadCrypto.h"
 #include "rfp/stego/Capacity.h"
 #include "rfp/stego/StegoDecoder.h"
 #include "rfp/stego/StegoDispersion.h"
@@ -38,11 +41,16 @@
 #include <QDebug>
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
 #include <numeric>
 #include <sstream>
 
+// ============================================================================
+//  Anonymous namespace
+// ============================================================================
 namespace {
+
 QString crcToText(std::uint32_t crc) {
     return QStringLiteral("%1").arg(crc, 8, 16, QLatin1Char('0')).toUpper();
 }
@@ -65,10 +73,29 @@ double computeAutoThreshold(const rfp::stego::ImageBuffer &image,
     const std::size_t idx = static_cast<std::size_t>(static_cast<double>(values.size()) * 0.7);
     return values[idx];
 }
+
 } // namespace
 
 // ============================================================================
-// Constructor / Destructor
+//  Crypto overhead (static)
+// ============================================================================
+std::size_t MainWindow::cryptoOverheadBytes(rfp::crypto::CipherId id) noexcept
+{
+    //  Header (16B) + salt (16B) + iv + tag + CBC padding (16B worst case).
+    constexpr std::size_t kHeader = 16;
+    constexpr std::size_t kSalt   = 16;
+
+    const auto spec = rfp::crypto::CryptoRegistry::cipherSpec(id);
+    if (!spec) return kHeader + kSalt;
+
+    std::size_t total = kHeader + kSalt + spec->ivSize + spec->tagSize;
+    if (spec->kind == rfp::crypto::CipherKind::BlockCbc)
+        total += 16;
+    return total;
+}
+
+// ============================================================================
+//  Constructor / Destructor
 // ============================================================================
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), settings_("RFP", "RFP-GUI") {
@@ -97,7 +124,7 @@ MainWindow::~MainWindow() {
 }
 
 // ============================================================================
-// setupUi
+//  setupUi
 // ============================================================================
 void MainWindow::setupUi() {
     auto *central = new QWidget(this);
@@ -158,6 +185,10 @@ void MainWindow::setupUi() {
     usageLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     payloadLayout->addWidget(usageLabel_);
     embedLeftLayout->addWidget(payloadGroup, 1);
+
+    // Encryption panel (Embed)
+    embedCryptoPanel_ = new CryptoPanel(CryptoPanel::Role::Embed, embedLeft);
+    embedLeftLayout->addWidget(embedCryptoPanel_);
 
     auto *embedParamsGroup = new QGroupBox(tr("Steganography parameters (Embed)"), embedLeft);
     embedParamsGroup->setCheckable(true);
@@ -294,17 +325,31 @@ void MainWindow::setupUi() {
 
     auto *extractParamsGroup = new QGroupBox(tr("Extraction options"), extractLeft);
     auto *extractParamsLayout = new QFormLayout(extractParamsGroup);
-    autoDetectSizeCheck_ = new QCheckBox(tr("Auto-detect payload size (recommended)"), extractParamsGroup);
+
+    // Auto-detect is a visual mirror of Settings → "Write payload size header".
+    autoDetectSizeCheck_ = new QCheckBox(
+        tr("Header written at embed time (auto-detect payload size)"),
+        extractParamsGroup);
     autoDetectSizeCheck_->setChecked(true);
+    autoDetectSizeCheck_->setEnabled(false);   // read-only mirror
+    autoDetectSizeCheck_->setToolTip(tr(
+        "This reflects the 'Write payload size header' setting in Settings. "
+        "Change it there."));
     extractParamsLayout->addRow(autoDetectSizeCheck_);
 
     payloadSizeSpin_ = new QSpinBox(extractParamsGroup);
     payloadSizeSpin_->setRange(1, 100000000);
     payloadSizeSpin_->setValue(1024);
-    payloadSizeSpin_->setEnabled(false);
+    payloadSizeSpin_->setToolTip(tr(
+        "Used only when the embed did NOT write a size header. "
+        "Must exactly match the length of the embedded payload."));
     extractParamsLayout->addRow(tr("Payload size (bytes):"), payloadSizeSpin_);
 
     extractLeftLayout->addWidget(extractParamsGroup);
+
+    // Decryption panel (Extract)
+    extractCryptoPanel_ = new CryptoPanel(CryptoPanel::Role::Extract, extractLeft);
+    extractLeftLayout->addWidget(extractCryptoPanel_);
 
     auto *extractParamsGroup2 = new QGroupBox(tr("Steganography parameters (Extract)"), extractLeft);
     extractParamsGroup2->setCheckable(true);
@@ -416,14 +461,14 @@ void MainWindow::setupUi() {
 
     mainLayout->addWidget(tabWidget_);
 
-        // Статусбар: слева — текст, справа — индикатор занятости
+    // Статусбар: слева — текст, справа — индикатор занятости
     statusLabel_ = new QLabel(tr("Ready"), this);
     statusLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     statusLabel_->setMinimumWidth(300);
     statusBar()->addWidget(statusLabel_, 1);
 
     progressBar_ = new QProgressBar(this);
-    progressBar_->setRange(0, 0);          // неопределённый режим
+    progressBar_->setRange(0, 0);
     progressBar_->setTextVisible(false);
     progressBar_->setFixedWidth(160);
     progressBar_->setVisible(false);
@@ -433,7 +478,7 @@ void MainWindow::setupUi() {
 }
 
 // ============================================================================
-// setupConnections
+//  setupConnections
 // ============================================================================
 void MainWindow::setupConnections() {
     auto *browseInputBtn = findChild<QPushButton *>("browseInputBtn");
@@ -447,7 +492,7 @@ void MainWindow::setupConnections() {
         connect(browseExtractBtn, &QPushButton::clicked, this, [this]() {
             QString path = QFileDialog::getOpenFileName(
                 this, tr("Select input image"), QString(),
-                tr("Images (*.png *.bmp *.tif *.tiff);;All files (*.*)"));
+                tr("Images (*.png *.bmp *.tif *.tiff *.ppm *.pgm);;All files (*.*)"));
             if (!path.isEmpty())
                 inputImageExtractEdit_->setText(path);
         });
@@ -464,7 +509,7 @@ void MainWindow::setupConnections() {
     connect(fullscreenButton_, &QPushButton::clicked, this, &MainWindow::onFullscreen);
     connect(helpButton_, &QPushButton::clicked, this, &MainWindow::showHelp);
 
-        // Авто-порог для embed — считаем в фоне
+    // Auto-threshold (Embed)
     connect(embedAutoThresholdBtn_, &QPushButton::clicked, this, [this]() {
         if (!currentImage_) {
             QMessageBox::warning(this, tr("R.F.P."), tr("Load an input image first."));
@@ -488,7 +533,7 @@ void MainWindow::setupConnections() {
         }));
     });
 
-    // Авто-порог для extract
+    // Auto-threshold (Extract)
     connect(extractAutoThresholdBtn_, &QPushButton::clicked, this, [this]() {
         if (!currentImage_) {
             QMessageBox::warning(this, tr("R.F.P."), tr("Load an input image first."));
@@ -549,13 +594,17 @@ void MainWindow::setupConnections() {
     connect(extractThresholdEdit_, &QLineEdit::textChanged, this, updateSlot);
     connect(extractShuffleCheck_, &QCheckBox::toggled, this, updateSlot);
 
-    connect(autoDetectSizeCheck_, &QCheckBox::toggled, payloadSizeSpin_, &QSpinBox::setDisabled);
+    // Crypto panels
+    if (embedCryptoPanel_)
+        connect(embedCryptoPanel_, &CryptoPanel::changed, this, &MainWindow::onEmbedCryptoChanged);
+    if (extractCryptoPanel_)
+        connect(extractCryptoPanel_, &CryptoPanel::changed, this, &MainWindow::onExtractCryptoChanged);
 
     connect(qApp, &QCoreApplication::aboutToQuit, this, &MainWindow::saveSettings);
 }
 
 // ============================================================================
-// loadSettings / saveSettings / applySettings
+//  loadSettings / saveSettings / applySettings
 // ============================================================================
 void MainWindow::loadSettings() {
     settings_.beginGroup("MainWindow");
@@ -597,6 +646,22 @@ void MainWindow::loadSettings() {
     }
     settings_.endGroup();
 
+    // Crypto (Embed) — settings only, no password.
+    settings_.beginGroup("CryptoEmbed");
+    if (embedCryptoPanel_) {
+        embedCryptoPanel_->setEncryptionEnabled(
+            settings_.value("enabled", false).toBool());
+        const int cipherInt = settings_.value("cipher",
+            static_cast<int>(rfp::crypto::CipherId::Aes256Gcm)).toInt();
+        embedCryptoPanel_->setCipher(static_cast<rfp::crypto::CipherId>(cipherInt));
+        const int kdfInt = settings_.value("kdf",
+            static_cast<int>(rfp::crypto::KdfId::Pbkdf2HmacSha256)).toInt();
+        embedCryptoPanel_->setKdf(static_cast<rfp::crypto::KdfId>(kdfInt));
+        embedCryptoPanel_->setIterations(
+            static_cast<std::uint32_t>(settings_.value("iterations", 100000).toUInt()));
+    }
+    settings_.endGroup();
+
     settings_.beginGroup("ParamsExtract");
     {
         QSignalBlocker b1(extractBitsSpin_);
@@ -625,16 +690,19 @@ void MainWindow::loadSettings() {
     }
     settings_.endGroup();
 
+    // Crypto (Extract)
+    settings_.beginGroup("CryptoExtract");
+    if (extractCryptoPanel_) {
+        extractCryptoPanel_->setEncryptionEnabled(
+            settings_.value("enabled", false).toBool());
+    }
+    settings_.endGroup();
+
     settings_.beginGroup("Extract");
     {
-        QSignalBlocker b1(autoDetectSizeCheck_);
-        QSignalBlocker b2(payloadSizeSpin_);
-        if (autoDetectSizeCheck_)
-            autoDetectSizeCheck_->setChecked(settings_.value("autoDetect", true).toBool());
+        QSignalBlocker b1(payloadSizeSpin_);
         if (payloadSizeSpin_)
             payloadSizeSpin_->setValue(settings_.value("payloadSize", 1024).toInt());
-        if (payloadSizeSpin_ && autoDetectSizeCheck_)
-            payloadSizeSpin_->setEnabled(!autoDetectSizeCheck_->isChecked());
     }
     settings_.endGroup();
 
@@ -669,6 +737,15 @@ void MainWindow::saveSettings() {
     settings_.setValue("shuffle", embedShuffleCheck_->isChecked());
     settings_.endGroup();
 
+    settings_.beginGroup("CryptoEmbed");
+    if (embedCryptoPanel_) {
+        settings_.setValue("enabled",    embedCryptoPanel_->encryptionEnabled());
+        settings_.setValue("cipher",     static_cast<int>(embedCryptoPanel_->cipher()));
+        settings_.setValue("kdf",        static_cast<int>(embedCryptoPanel_->kdf()));
+        settings_.setValue("iterations", static_cast<uint>(embedCryptoPanel_->iterations()));
+    }
+    settings_.endGroup();
+
     settings_.beginGroup("ParamsExtract");
     settings_.setValue("bits", extractBitsSpin_->value());
     settings_.setValue("seed", extractSeedSpin_->value());
@@ -683,8 +760,13 @@ void MainWindow::saveSettings() {
     settings_.setValue("shuffle", extractShuffleCheck_->isChecked());
     settings_.endGroup();
 
+    settings_.beginGroup("CryptoExtract");
+    if (extractCryptoPanel_) {
+        settings_.setValue("enabled", extractCryptoPanel_->encryptionEnabled());
+    }
+    settings_.endGroup();
+
     settings_.beginGroup("Extract");
-    settings_.setValue("autoDetect", autoDetectSizeCheck_->isChecked());
     settings_.setValue("payloadSize", payloadSizeSpin_->value());
     settings_.endGroup();
 
@@ -732,11 +814,20 @@ void MainWindow::applySettings() {
         highlightChanges_ = settingsDialog_->highlightChanges();
         writeHeader_ = settingsDialog_->writeHeader();
     }
+
+    // Sync the auto-detect checkbox / manual-size spinner with header mode.
+    if (autoDetectSizeCheck_) {
+        QSignalBlocker b(autoDetectSizeCheck_);
+        autoDetectSizeCheck_->setChecked(writeHeader_);
+        autoDetectSizeCheck_->setEnabled(false);
+    }
+    if (payloadSizeSpin_) payloadSizeSpin_->setEnabled(!writeHeader_);
+
     scheduleUpdate();
 }
 
 // ============================================================================
-// Events
+//  Events
 // ============================================================================
 void MainWindow::closeEvent(QCloseEvent *event) {
     saveSettings();
@@ -769,12 +860,12 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
 }
 
 // ============================================================================
-// Browse / Embed / Extract
+//  Browse / Embed / Extract
 // ============================================================================
 void MainWindow::browseInputImage() {
     QString path = QFileDialog::getOpenFileName(
         this, tr("Select input image"), QString(),
-        tr("Images (*.png *.bmp *.tif *.tiff);;All files (*.*)"));
+        tr("Images (*.png *.bmp *.tif *.tiff *.ppm *.pgm);;All files (*.*)"));
     if (path.isEmpty()) return;
     inputImageEdit_->setText(path);
 
@@ -811,7 +902,7 @@ void MainWindow::browseInputImage() {
 void MainWindow::browseOutputImage() {
     QString path = QFileDialog::getSaveFileName(
         this, tr("Select output image"), QString(),
-        tr("PNG (*.png);;BMP (*.bmp);;All files (*.*)"));
+        tr("PNG (*.png);;BMP (*.bmp);;PPM (*.ppm);;All files (*.*)"));
     if (!path.isEmpty())
         outputImageEdit_->setText(path);
 }
@@ -822,6 +913,21 @@ void MainWindow::embedText() {
         QMessageBox::warning(this, tr("R.F.P."), tr("Specify input and output image paths."));
         return;
     }
+
+    const bool encrypting =
+        embedCryptoPanel_ && embedCryptoPanel_->encryptionEnabled();
+    if (encrypting) {
+        if (embedCryptoPanel_->password().isEmpty()) {
+            QMessageBox::warning(this, tr("R.F.P."),
+                tr("Encryption is enabled but the password is empty."));
+            return;
+        }
+        if (!embedCryptoPanel_->validatedPassword().has_value()) {
+            QMessageBox::warning(this, tr("R.F.P."), tr("Passwords do not match."));
+            return;
+        }
+    }
+
     QString text = payloadEdit_->toPlainText();
     QByteArray utf8 = text.toUtf8();
     if (utf8.isEmpty()) {
@@ -834,11 +940,16 @@ void MainWindow::embedText() {
     }
     auto params = collectParams(false);
     auto capacity = rfp::stego::capacityBytes(currentImage_.value(), params);
-    size_t needed = utf8.size() + (writeHeader_ ? 4 : 0);
+
+    std::size_t needed = static_cast<std::size_t>(utf8.size());
+    if (encrypting)
+        needed += MainWindow::cryptoOverheadBytes(embedCryptoPanel_->cipher());
+    if (writeHeader_) needed += 4;
+
     if (needed > capacity) {
         QMessageBox::warning(this, tr("R.F.P."),
-                             tr("Payload too large. Capacity: %1 bytes (including header if enabled).")
-                                 .arg(capacity));
+            tr("Payload too large. Need %1 bytes, capacity is %2 bytes.")
+                .arg(needed).arg(capacity));
         return;
     }
     beginBusy(tr("Embedding..."));
@@ -847,15 +958,50 @@ void MainWindow::embedText() {
 }
 
 void MainWindow::runEmbed(const QString &input, const QString &output, const QByteArray &data) {
-    QByteArray payloadData;
-    if (writeHeader_) {
-        payloadData.resize(4 + data.size());
-        *reinterpret_cast<uint32_t *>(payloadData.data()) = static_cast<uint32_t>(data.size());
-        std::memcpy(payloadData.data() + 4, data.data(), data.size());
+    (void)output;   // saved later in onEmbedFinished
+
+    // 1) Optional encryption.
+    rfp::core::ByteBuffer inner;
+    const bool encrypting =
+        embedCryptoPanel_ && embedCryptoPanel_->encryptionEnabled();
+
+    if (encrypting) {
+        const QString pw = embedCryptoPanel_->password();
+        auto ep = collectEncryptParams(pw);
+        auto encResult = rfp::payload::encrypt(
+            std::span<const rfp::core::Byte>(
+                reinterpret_cast<const rfp::core::Byte*>(data.constData()),
+                static_cast<std::size_t>(data.size())),
+            ep);
+        if (!encResult) {
+            endBusy();
+            embedding_ = false;
+            QMessageBox::warning(this, tr("R.F.P."),
+                tr("Encryption failed: %1")
+                    .arg(QString::fromStdString(encResult.error().message)));
+            setStatus(tr("Encryption failed"), 5000);
+            return;
+        }
+        inner = std::move(encResult.value());
     } else {
-        payloadData = data;
+        inner.assign(reinterpret_cast<const rfp::core::Byte*>(data.constData()),
+                     reinterpret_cast<const rfp::core::Byte*>(data.constData()) +
+                         data.size());
     }
-    rfp::core::ByteBuffer payload(payloadData.begin(), payloadData.end());
+
+    // 2) Optional 4-byte size header (byte-by-byte, avoids unaligned UB).
+    rfp::core::ByteBuffer payload;
+    if (writeHeader_) {
+        const auto n = static_cast<std::uint32_t>(inner.size());
+        payload.reserve(4 + inner.size());
+        payload.push_back(static_cast<rfp::core::Byte>((n >> 24) & 0xFF));
+        payload.push_back(static_cast<rfp::core::Byte>((n >> 16) & 0xFF));
+        payload.push_back(static_cast<rfp::core::Byte>((n >>  8) & 0xFF));
+        payload.push_back(static_cast<rfp::core::Byte>( n        & 0xFF));
+        payload.insert(payload.end(), inner.begin(), inner.end());
+    } else {
+        payload = std::move(inner);
+    }
 
     auto params = collectParams(false);
 
@@ -894,17 +1040,24 @@ void MainWindow::onEmbedFinished() {
     }
 
     QByteArray originalData = payloadEdit_->toPlainText().toUtf8();
-    updateStats(tr("Embedded %1 bytes%2.")
+    const bool encrypted =
+        embedCryptoPanel_ && embedCryptoPanel_->encryptionEnabled();
+
+    updateStats(tr("Embedded %1 bytes%2%3.")
                     .arg(originalData.size())
-                    .arg(writeHeader_ ? " (header included)" : ""));
+                    .arg(encrypted ? tr(" (encrypted)") : QString())
+                    .arg(writeHeader_ ? tr(" (header included)") : tr(" (no header)")));
 
     auto crc = rfp::core::crc32(std::span<const rfp::core::Byte>(
         reinterpret_cast<const rfp::core::Byte *>(originalData.constData()),
         static_cast<size_t>(originalData.size())));
 
+    if (encrypted && embedCryptoPanel_) embedCryptoPanel_->clearConfirm();
+
     endBusy();
-    setStatus(tr("Embedded %1 bytes. CRC32: %2")
+    setStatus(tr("Embedded %1 bytes%2. CRC32: %3")
                   .arg(originalData.size())
+                  .arg(encrypted ? tr(" (encrypted)") : QString())
                   .arg(crcToText(crc)), 8000);
     scheduleUpdate();
 }
@@ -915,44 +1068,99 @@ void MainWindow::extractText() {
         QMessageBox::warning(this, tr("R.F.P."), tr("Specify input image path."));
         return;
     }
+
+    const bool decrypting =
+        extractCryptoPanel_ && extractCryptoPanel_->encryptionEnabled();
+    if (decrypting && extractCryptoPanel_->password().isEmpty()) {
+        QMessageBox::warning(this, tr("R.F.P."),
+            tr("Decryption is enabled but the password is empty."));
+        return;
+    }
+
     beginBusy(tr("Extracting..."));
     extracting_ = true;
-    size_t payloadSize = 0;
-    if (writeHeader_ && autoDetectSizeCheck_->isChecked()) {
-        payloadSize = 4;
-    } else {
-        payloadSize = static_cast<size_t>(payloadSizeSpin_->value());
-    }
-    runExtract(inputImageExtractEdit_->text(), payloadSize);
+    runExtract(inputImageExtractEdit_->text());
 }
 
-void MainWindow::runExtract(const QString &input, size_t payloadSize) {
+void MainWindow::runExtract(const QString &input) {
     auto params = collectParams(true);
-    bool autoDetect = writeHeader_ && autoDetectSizeCheck_->isChecked();
+
+    // Snapshot all mode-deciding settings on the UI thread.
+    const bool hasHeader   = writeHeader_;
+    const std::size_t manualSize =
+        static_cast<std::size_t>(payloadSizeSpin_->value());
+
+    const bool decrypting =
+        extractCryptoPanel_ && extractCryptoPanel_->encryptionEnabled();
+    const std::string password =
+        decrypting ? extractCryptoPanel_->password().toStdString() : std::string{};
 
     auto future = QtConcurrent::run(
-        [input, payloadSize, params, autoDetect]() -> rfp::core::Result<rfp::core::ByteBuffer> {
+        [input, params, hasHeader, manualSize, decrypting, password]()
+            -> rfp::core::Result<rfp::core::ByteBuffer>
+        {
             auto imageResult = rfp::gui::loadImageBuffer(input);
             if (!imageResult) return imageResult.error();
-            if (autoDetect) {
-                auto headerResult = rfp::stego::StegoDecoder::extractBytes(
-                    imageResult.value(), 4, params);
-                if (!headerResult) return headerResult.error();
-                if (headerResult.value().size() != 4)
+            const auto& image = imageResult.value();
+
+            // StegoDecoder always starts from slot 0. Read the WHOLE frame in
+            // one call, then slice in memory. Two calls would re-read the
+            // header and never reach the actual payload.
+            const std::size_t capacity = rfp::stego::capacityBytes(image, params);
+            if (capacity == 0)
+                return rfp::core::Error{rfp::core::ErrorCode::InvalidImageBuffer,
+                                        "Image has zero capacity for these parameters"};
+
+            auto frameResult = rfp::stego::StegoDecoder::extractBytes(
+                image, capacity, params);
+            if (!frameResult) return frameResult.error();
+            const auto& frame = frameResult.value();
+
+            std::size_t payloadStart = 0;
+            std::size_t payloadSize  = 0;
+
+            if (hasHeader) {
+                if (frame.size() < 4)
                     return rfp::core::Error{rfp::core::ErrorCode::InvalidImageBuffer,
-                                            "Failed to read header"};
-                uint32_t realSize = *reinterpret_cast<const uint32_t *>(headerResult.value().data());
-                if (realSize > 100000000)
-                    return rfp::core::Error{rfp::core::ErrorCode::InvalidImageBuffer,
-                                            "Invalid payload size"};
-                return rfp::stego::StegoDecoder::extractBytes(imageResult.value(), realSize, params);
+                                            "Frame too short to contain a size header"};
+                payloadSize =
+                    (static_cast<std::uint32_t>(frame[0]) << 24) |
+                    (static_cast<std::uint32_t>(frame[1]) << 16) |
+                    (static_cast<std::uint32_t>(frame[2]) <<  8) |
+                     static_cast<std::uint32_t>(frame[3]);
+                payloadStart = 4;
+
+                if (payloadSize == 0 ||
+                    payloadStart + payloadSize > frame.size()) {
+                    return rfp::core::Error{
+                        rfp::core::ErrorCode::InvalidImageBuffer,
+                        "Invalid payload size in header. "
+                        "'Write payload size header' must match between "
+                        "embed and extract."};
+                }
             } else {
-                return rfp::stego::StegoDecoder::extractBytes(imageResult.value(), payloadSize, params);
+                payloadSize = manualSize;
+                if (payloadSize == 0 || payloadSize > frame.size()) {
+                    return rfp::core::Error{
+                        rfp::core::ErrorCode::InvalidArgument,
+                        "Manual payload size is out of range for this image."};
+                }
             }
+
+            rfp::core::ByteBuffer payload(
+                frame.begin() + static_cast<std::ptrdiff_t>(payloadStart),
+                frame.begin() + static_cast<std::ptrdiff_t>(payloadStart + payloadSize));
+
+            if (!decrypting) return payload;
+
+            rfp::payload::DecryptParams dp;
+            dp.password = password;
+            return rfp::payload::decrypt(payload, dp);
         });
 
     extractWatcher_.setFuture(future);
-    connect(&extractWatcher_, &QFutureWatcher<rfp::core::Result<rfp::core::ByteBuffer>>::finished,
+    connect(&extractWatcher_,
+            &QFutureWatcher<rfp::core::Result<rfp::core::ByteBuffer>>::finished,
             this, &MainWindow::onExtractFinished);
 }
 
@@ -972,15 +1180,24 @@ void MainWindow::onExtractFinished() {
     auto crc = rfp::core::crc32(std::span<const rfp::core::Byte>(data.data(), data.size()));
     updateStats(tr("Extracted %1 bytes").arg(data.size()));
     endBusy();
-    setStatus(tr("Extracted %1 bytes. CRC32: %2").arg(data.size()).arg(crcToText(crc)), 8000);
+
+    const bool decrypted =
+        extractCryptoPanel_ && extractCryptoPanel_->encryptionEnabled();
+    setStatus(tr("Extracted %1 bytes%2. CRC32: %3")
+                  .arg(data.size())
+                  .arg(decrypted ? tr(" (decrypted)") : QString())
+                  .arg(crcToText(crc)), 8000);
 }
 
 void MainWindow::onTextChanged() {
     scheduleUpdate();
 }
 
+void MainWindow::onEmbedCryptoChanged()   { scheduleUpdate(); }
+void MainWindow::onExtractCryptoChanged() { scheduleUpdate(); }
+
 // ============================================================================
-// Debounced async recompute
+//  Debounced async recompute
 // ============================================================================
 void MainWindow::scheduleUpdate() {
     if (!updateTimer_) return;
@@ -1014,12 +1231,19 @@ void MainWindow::doUpdate() {
     const QImage modQImg    = modifiedQImage_.value_or(QImage());
     const bool hasModified  = modifiedQImage_.has_value();
 
+    const bool encrypting =
+        embedCryptoPanel_ && embedCryptoPanel_->encryptionEnabled();
+    const std::size_t cryptoOverhead = encrypting
+        ? MainWindow::cryptoOverheadBytes(embedCryptoPanel_->cipher())
+        : 0;
+
     recomputeInProgress_ = true;
     beginBusy(tr("Computing capacity and preview..."));
 
     auto future = QtConcurrent::run(
         [params, payloadText, showPreview, previewMode, overlayOp,
-         highlight, writeHdr, imageCopy, curQImg, modQImg, hasModified]() -> RecomputeResult {
+         highlight, writeHdr, imageCopy, curQImg, modQImg, hasModified,
+         encrypting, cryptoOverhead]() -> RecomputeResult {
 
         RecomputeResult res;
 
@@ -1032,21 +1256,31 @@ void MainWindow::doUpdate() {
             uniformParams.mode = rfp::stego::SlotSelectionMode::Uniform;
             const size_t uniformBytes = rfp::stego::capacityBytes(imageCopy, uniformParams);
             if (uniformBytes > 0) {
-                const double percent = (double)capacity / uniformBytes * 100.0;
+                const double percent =
+                    static_cast<double>(capacity) / static_cast<double>(uniformBytes) * 100.0;
                 info += tr(" (using %1% of available)").arg(percent, 0, 'f', 1);
             }
         }
         res.capacityText = info;
 
         const QByteArray utf8 = payloadText.toUtf8();
-        const size_t used = static_cast<size_t>(utf8.size()) + (writeHdr ? 4 : 0);
+        std::size_t used = static_cast<std::size_t>(utf8.size());
+        if (encrypting) used += cryptoOverhead;
+        if (writeHdr)   used += 4;
+
         if (capacity == 0) {
             res.usageText = tr("Usage: 0 bytes (capacity 0)");
         } else {
-            const double percent = (double)used / capacity * 100.0;
+            const double percent =
+                static_cast<double>(used) / static_cast<double>(capacity) * 100.0;
             const QString color = (used <= capacity) ? "green" : "red";
-            res.usageText = tr("Usage: <span style=\"color:%1;\">%2 / %3 bytes (%4%)</span>")
-                                .arg(color).arg(used).arg(capacity).arg(percent, 0, 'f', 1);
+            QString tag;
+            if (encrypting) tag = tr(" (encrypted)");
+            res.usageText =
+                tr("Usage: <span style=\"color:%1;\">%2 / %3 bytes (%4%)</span>%5")
+                    .arg(color).arg(used).arg(capacity)
+                    .arg(percent, 0, 'f', 1)
+                    .arg(tag);
         }
 
         if (!showPreview) return res;
@@ -1092,7 +1326,8 @@ void MainWindow::doUpdate() {
                         if (curQImg.pixel(x, y) != modQImg.pixel(x, y))
                             ++changed;
                 const double percent =
-                    (double)changed / (curQImg.width() * curQImg.height()) * 100.0;
+                    static_cast<double>(changed) /
+                    (static_cast<double>(curQImg.width()) * curQImg.height()) * 100.0;
                 stats = tr("Changed pixels: %1 / %2 (%3%)")
                             .arg(changed)
                             .arg(curQImg.width() * curQImg.height())
@@ -1130,8 +1365,6 @@ void MainWindow::onPreviewReady() {
         updateStats("");
     }
 
-    // Если во время вычисления пришёл новый запрос — НЕ скрываем busy,
-    // сразу запускаем следующий расчёт.
     if (recomputePending_) {
         recomputePending_ = false;
         QTimer::singleShot(0, this, &MainWindow::doUpdate);
@@ -1143,7 +1376,7 @@ void MainWindow::onPreviewReady() {
 }
 
 // ============================================================================
-// Вспомогательные static-методы (можно звать из любого потока)
+//  Static helpers
 // ============================================================================
 QImage MainWindow::imageBufferToQImage(const rfp::stego::ImageBuffer &buffer) const {
     if (!buffer.isValid()) return QImage();
@@ -1259,7 +1492,7 @@ QColor MainWindow::dispersionToColor(double value, double minVal, double maxVal)
 }
 
 // ============================================================================
-// Serialization / Copy-Paste params
+//  Serialization / Copy-Paste params
 // ============================================================================
 QString MainWindow::serializeFull(const rfp::stego::StegoParams &params,
                                   const QString &inputPath,
@@ -1275,7 +1508,16 @@ QString MainWindow::serializeFull(const rfp::stego::StegoParams &params,
         << ";window=" << params.windowSize
         << ";metric=" << static_cast<int>(params.metric)
         << ";threshold=" << params.dispersionThreshold
-        << ";shuffle=" << (params.applyShuffleAfterSort ? 1 : 0);
+        << ";shuffle=" << (params.applyShuffleAfterSort ? 1 : 0)
+        << ";header="  << (writeHeader_ ? 1 : 0);
+
+    // Crypto settings (NOT the password).
+    if (embedCryptoPanel_) {
+        oss << ";encrypt=" << (embedCryptoPanel_->encryptionEnabled() ? 1 : 0)
+            << ";cipher="  << static_cast<int>(embedCryptoPanel_->cipher())
+            << ";kdf="     << static_cast<int>(embedCryptoPanel_->kdf())
+            << ";iter="    << embedCryptoPanel_->iterations();
+    }
 
     auto escape = [](const QString &s) {
         QString r = s;
@@ -1291,7 +1533,7 @@ QString MainWindow::serializeFull(const rfp::stego::StegoParams &params,
 }
 
 bool MainWindow::deserializeFull(const QString &str, rfp::stego::StegoParams &params,
-                                 QString &inputPath, QString &outputPath) const {
+                                 QString &inputPath, QString &outputPath) {
     params.bitsPerChannel = 1;
     params.seed = 0;
     params.useRedChannel = true;
@@ -1331,6 +1573,16 @@ bool MainWindow::deserializeFull(const QString &str, rfp::stego::StegoParams &pa
             params.dispersionThreshold = value.toDouble();
         else if (key == "shuffle")
             params.applyShuffleAfterSort = (value.toInt() != 0);
+        else if (key == "header")
+            writeHeader_ = (value.toInt() != 0);
+        else if (key == "encrypt" && embedCryptoPanel_)
+            embedCryptoPanel_->setEncryptionEnabled(value.toInt() != 0);
+        else if (key == "cipher" && embedCryptoPanel_)
+            embedCryptoPanel_->setCipher(static_cast<rfp::crypto::CipherId>(value.toInt()));
+        else if (key == "kdf" && embedCryptoPanel_)
+            embedCryptoPanel_->setKdf(static_cast<rfp::crypto::KdfId>(value.toInt()));
+        else if (key == "iter" && embedCryptoPanel_)
+            embedCryptoPanel_->setIterations(static_cast<std::uint32_t>(value.toUInt()));
         else if (key == "input") {
             QString s = value;
             s.replace("%3B", ";");
@@ -1404,6 +1656,13 @@ void MainWindow::pasteEmbedParams() {
     if (!inputPath.isEmpty())  inputImageEdit_->setText(inputPath);
     if (!outputPath.isEmpty()) outputImageEdit_->setText(outputPath);
 
+    // Reflect possibly-updated writeHeader_ in the Extract tab UI.
+    if (autoDetectSizeCheck_) {
+        QSignalBlocker b(autoDetectSizeCheck_);
+        autoDetectSizeCheck_->setChecked(writeHeader_);
+    }
+    if (payloadSizeSpin_) payloadSizeSpin_->setEnabled(!writeHeader_);
+
     setStatus(tr("Embedding parameters pasted from clipboard."), 2000);
     scheduleUpdate();
 }
@@ -1463,6 +1722,13 @@ void MainWindow::pasteExtractParams() {
         extractShuffleCheck_->setChecked(params.applyShuffleAfterSort);
     }
 
+    // Reflect header mode coming from the clipboard.
+    if (autoDetectSizeCheck_) {
+        QSignalBlocker b(autoDetectSizeCheck_);
+        autoDetectSizeCheck_->setChecked(writeHeader_);
+    }
+    if (payloadSizeSpin_) payloadSizeSpin_->setEnabled(!writeHeader_);
+
     if (!outputPath.isEmpty()) {
         inputImageExtractEdit_->setText(outputPath);
         setStatus(tr("Extraction parameters pasted and input path set to output from copied data."), 2000);
@@ -1473,7 +1739,7 @@ void MainWindow::pasteExtractParams() {
 }
 
 // ============================================================================
-// Прочее
+//  Misc
 // ============================================================================
 void MainWindow::onMaskingFinished() {}
 
@@ -1511,6 +1777,18 @@ rfp::stego::StegoParams MainWindow::collectParams(bool forExtract) const {
     return params;
 }
 
+rfp::payload::EncryptParams
+MainWindow::collectEncryptParams(const QString& password) const {
+    rfp::payload::EncryptParams p;
+    p.password = password.toStdString();
+    if (embedCryptoPanel_) {
+        p.cipher     = embedCryptoPanel_->cipher();
+        p.kdf        = embedCryptoPanel_->kdf();
+        p.iterations = embedCryptoPanel_->iterations();
+    }
+    return p;
+}
+
 void MainWindow::showImage(const QImage &image, bool fit) {
     if (!previewScene_ || !previewView_) return;
     previewScene_->clear();
@@ -1543,6 +1821,7 @@ void MainWindow::setStatus(const QString &text, int timeout) {
             if (statusLabel_) statusLabel_->clear();
         });
 }
+
 void MainWindow::beginBusy(const QString &message) {
     ++busyCounter_;
     if (progressBar_) {
@@ -1562,8 +1841,6 @@ void MainWindow::endBusy() {
     }
 }
 
-
-
 void MainWindow::updateStats(const QString &text) {
     if (!statsLabel_) return;
     statsLabel_->setText(text);
@@ -1572,7 +1849,6 @@ void MainWindow::updateStats(const QString &text) {
 void MainWindow::onFullscreen() {
     if (!previewScene_) return;
 
-    // Открываем модальное top-level окно на весь экран с той же сценой.
     auto *dlg = new QDialog(this);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setWindowTitle(tr("Preview"));
@@ -1592,12 +1868,10 @@ void MainWindow::onFullscreen() {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(view);
 
-    // Показать на весь экран и вписать картинку
     dlg->showFullScreen();
     if (previewScene_->itemsBoundingRect().isValid())
         view->fitInView(previewScene_->itemsBoundingRect(), Qt::KeepAspectRatio);
 
-    // Небольшая задержка: покажем подсказку, что Esc закрывает окно
     setStatus(tr("Fullscreen: press Esc to exit"), 3000);
 }
 

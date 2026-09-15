@@ -335,6 +335,117 @@
         <source>Changed pixels: %1 / %2 (%3%)</source>
         <translation>Изменённых пикселей: %1 / %2 (%3%)</translation>
     </message>
+    <message>
+        <source>Header written at embed time (auto-detect payload size)</source>
+        <translation>Заголовок записан при встраивании (автоопределение размера)</translation>
+    </message>
+    <message>
+        <source>This reflects the 'Write payload size header' setting in Settings. Change it there.</source>
+        <translation>Отражает настройку «Записывать заголовок размера» в Настройках. Изменить можно там.</translation>
+    </message>
+    <message>
+        <source>Used only when the embed did NOT write a size header. Must exactly match the length of the embedded payload.</source>
+        <translation>Используется, только если при встраивании заголовок не записывался. Должно точно совпадать с длиной встроенной нагрузки.</translation>
+    </message>
+    <message>
+        <source>Embedded %1 bytes%2%3.</source>
+        <translation>Встроено %1 байт%2%3.</translation>
+    </message>
+    <message>
+        <source> (encrypted)</source>
+        <translation> (зашифровано)</translation>
+    </message>
+    <message>
+        <source> (header included)</source>
+        <translation> (включая заголовок)</translation>
+    </message>
+    <message>
+        <source> (no header)</source>
+        <translation> (без заголовка)</translation>
+    </message>
+    <message>
+        <source> (decrypted)</source>
+        <translation> (расшифровано)</translation>
+    </message>
+    <message>
+        <source>Extracted %1 bytes%2. CRC32: %3</source>
+        <translation>Извлечено %1 байт%2. CRC32: %3</translation>
+    </message>
+    <message>
+        <source>Encryption is enabled but the password is empty.</source>
+        <translation>Шифрование включено, но пароль не введён.</translation>
+    </message>
+    <message>
+        <source>Passwords do not match.</source>
+        <translation>Пароли не совпадают.</translation>
+    </message>
+    <message>
+        <source>Decryption is enabled but the password is empty.</source>
+        <translation>Расшифровка включена, но пароль не введён.</translation>
+    </message>
+    <message>
+        <source>Encryption failed: %1</source>
+        <translation>Ошибка шифрования: %1</translation>
+    </message>
+    <message>
+        <source>Encryption failed</source>
+        <translation>Ошибка шифрования</translation>
+    </message>
+    <message>
+        <source>Payload too large. Need %1 bytes, capacity is %2 bytes.</source>
+        <translation>Данные слишком велики. Требуется %1 байт, ёмкость — %2 байт.</translation>
+    </message>
+</context>
+<context>
+    <name>CryptoPanel</name>
+    <message>
+        <source>Encryption</source>
+        <translation>Шифрование</translation>
+    </message>
+    <message>
+        <source>Decryption</source>
+        <translation>Расшифровка</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>Пароль</translation>
+    </message>
+    <message>
+        <source>Password:</source>
+        <translation>Пароль:</translation>
+    </message>
+    <message>
+        <source>Repeat password</source>
+        <translation>Повторите пароль</translation>
+    </message>
+    <message>
+        <source>Confirm:</source>
+        <translation>Подтверждение:</translation>
+    </message>
+    <message>
+        <source>Show / hide password</source>
+        <translation>Показать / скрыть пароль</translation>
+    </message>
+    <message>
+        <source>Cipher:</source>
+        <translation>Шифр:</translation>
+    </message>
+    <message>
+        <source>KDF:</source>
+        <translation>KDF:</translation>
+    </message>
+    <message>
+        <source>KDF iterations:</source>
+        <translation>Итераций KDF:</translation>
+    </message>
+    <message>
+        <source>Password is never written to disk or settings. Cipher, KDF and iterations are stored inside the encrypted payload.</source>
+        <translation>Пароль никогда не записывается на диск или в настройки. Шифр, KDF и число итераций хранятся внутри зашифрованного контейнера.</translation>
+    </message>
+    <message>
+        <source>Cipher, KDF and iterations are read from the payload — only the password is required.</source>
+        <translation>Шифр, KDF и число итераций читаются из контейнера — требуется только пароль.</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>

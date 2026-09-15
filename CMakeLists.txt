@@ -31,6 +31,7 @@ include(Coverage)
 add_subdirectory(src/core)
 add_subdirectory(src/stego)
 add_subdirectory(src/crypto)
+add_subdirectory(src/payload)
 
 if(RFP_BUILD_CLI)
     add_subdirectory(src/cli)

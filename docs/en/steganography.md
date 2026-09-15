@@ -39,6 +39,29 @@ The algorithm:
 
 5. **Take first `requiredBits`** slots.
 
+## What exactly is embedded
+
+The engine treats the payload as an opaque byte stream — it does not inspect
+its content. Two optional layers can wrap the user text:
+
+```
+[ 4-byte size header ]  ← optional, controlled by --header / Settings
+[ RFP1 encrypted blob | plaintext ]  ← depends on whether encryption is enabled
+```
+
+Both layers are pure bytes from the stego engine's point of view.
+
+## Size header
+
+When enabled, the embed prepends a 4‑byte big‑endian length field with the
+length of the actual payload. On extraction, the decoder reads the first 4
+bytes, then the indicated number of bytes. When disabled, the user supplies
+the length manually.
+
+The size header is independent of encryption: you can have any of the four
+combinations (header on/off × encrypted/plain), but **embed and extract must
+agree on the mode**.
+
 ## Parameters for extraction
 
 For successful extraction, the user must remember and reuse **all** parameters that affect slot order:
@@ -47,14 +70,18 @@ For successful extraction, the user must remember and reuse **all** parameters t
 - `bitsPerChannel`
 - Enabled channels (R/G/B/A)
 - `seed`
-- Payload size (bytes) – needed to know how many bits to read
+- Whether a size header was written (or, if not, the payload size in bytes)
 - **If Smart mode was used:**
   - `windowSize`
   - `dispersionMetric`
   - `dispersionThreshold`
   - `applyShuffleAfterSort` (on/off)
 
-The GUI displays all these parameters in the status bar after embedding, making it easy to record them.
+For **encrypted** payloads, the cipher, KDF, iteration count and salt/IV are
+read from the blob itself — only the password needs to be reproduced.
+
+The GUI displays all steganography parameters in the status bar after
+embedding, making it easy to record them.
 
 ## Why PNG first?
 

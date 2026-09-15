@@ -1,19 +1,21 @@
-
 # R.F.P. – Resilient File Protector
 
-**R.F.P.** is a desktop application for hiding private data inside ordinary image files (PNG, BMP, TIFF).  
-It uses **LSB steganography** – the least significant bits of pixel colour channels are replaced with payload bits.
+**R.F.P.** — это приложение для скрытия личных данных внутри обычных изображений (PNG, BMP, TIFF, PPM).
+Используется **LSB-стеганография** – младшие биты пикселей заменяются битами скрываемых данных. Дополнительно данные можно **зашифровать** перед сокрытием.
 
-## Quick start
+## Быстрый старт
 
-1. **Load an image** – click *Browse…* next to *Input image*.
-2. **Set parameters** – by default, 1 bit per channel, RGB channels enabled, uniform mode.
-3. **Enter text** in the payload area.
-4. **Click *Embed text*** – choose an output image path.
-5. **To extract**, load the stego image, set the same parameters (including payload size), and click *Extract text*.
+1. **Загрузите изображение** – нажмите *Обзор...* рядом с *Входное изображение*.
+2. **Установите параметры** – по умолчанию: 1 бит на канал, каналы RGB, режим Uniform.
+3. **Введите текст** в поле для полезной нагрузки.
+4. *(Необязательно)* Раскройте панель **Шифрование**, поставьте галочку *Зашифровать данные перед встраиванием*, введите пароль дважды. Шифр и KDF по умолчанию безопасны.
+5. Нажмите **Встроить** – укажите путь для выходного изображения.
+6. **Для извлечения** загрузите стего-изображение, задайте те же параметры, при необходимости раскройте **Расшифровку** и введите пароль, затем нажмите **Извлечь**.
 
-## Important
+## Важно
 
-- The image is saved as a normal raster file – **no metadata** (EXIF, PNG chunks, etc.) are modified.
-- Extraction requires **exactly the same parameters** that were used during embedding.
-- After embedding, the GUI displays a summary of parameters and the CRC32 checksum – record these for later extraction.
+- Изображение сохраняется как обычный растровый файл – **метаданные** (EXIF, блоки PNG и т.п.) не изменяются.
+- Извлечение требует **точно таких же параметров**, которые использовались при внедрении.
+- **Если включено шифрование**, шифр, KDF и число итераций читаются из самого контейнера — нужно ввести только пароль.
+- После внедрения интерфейс показывает сводку параметров и CRC32 – запишите их для последующего извлечения.
+- **Пароль восстановить невозможно.** Потеря пароля = потеря данных.

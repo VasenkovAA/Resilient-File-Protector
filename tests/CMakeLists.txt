@@ -10,6 +10,7 @@ add_executable(rfp-tests
     crypto/SecureMemoryTests.cpp
     crypto/EncodingTests.cpp
     crypto/CryptoPlaceholderTests.cpp
+    payload/PayloadCryptoTests.cpp
     stego/StegoParamsTests.cpp
     stego/StegoDispersionTests.cpp
     stego/StegoRoundTripTests.cpp
@@ -23,6 +24,7 @@ rfp_set_compiler_warnings(rfp-tests)
 target_include_directories(rfp-tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/crypto    # <-- чтобы PayloadCryptoTests нашел TestHelpers.h
 )
 
 target_link_libraries(rfp-tests
@@ -30,6 +32,7 @@ target_link_libraries(rfp-tests
         rfp::core
         rfp::stego
         rfp::crypto
+        rfp::payload
         GTest::gtest_main
 )
 
