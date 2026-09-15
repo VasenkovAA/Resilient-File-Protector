@@ -33,84 +33,84 @@ constexpr const char* kCliVersion = "0.4.0";
 void printHelp() {
     std::cout <<
         "R.F.P. - Resilient File Protector CLI " << kCliVersion << "\n"
-        "\n"
-        "Usage:\n"
-        "  rfp-cli <command> [options]\n"
-        "\n"
-        "Commands:\n"
-        "  help | --help | -h        Show this help.\n"
-        "  --version | -v            Print version.\n"
-        "  crc <text>                CRC32 of text.\n"
-        "  hash <text> [--algo <name>]\n"
-        "                            Hash of text. SHA-256 (default) | SHA-512 |\n"
-        "                            SHA3-256 | SHA3-512 | BLAKE2b.\n"
-        "  encrypt <text> [pw-opts] [--cipher <n>] [--kdf <n>]\n"
-        "                 [--iterations <N>] [--hex]\n"
-        "                            Produce RFP1 payload (Base64 by default).\n"
-        "  decrypt <encoded> [pw-opts] [--hex]\n"
-        "                            Decrypt an RFP1 payload.\n"
-        "  embed <in.(png|ppm)> <out.(png|ppm)> --text <text> [pw-opts]\n"
-        "        [--header on|off] [stego-opts]\n"
-        "                            Embed text into image; encrypts if a\n"
-        "                            password is provided.\n"
-        "  extract <in.(png|ppm)> [pw-opts] [--header on|off]\n"
-        "        [--payload-size N] [stego-opts]\n"
-        "                            Extract text from image; decrypts if a\n"
-        "                            password is provided.\n"
-        "  self-test [stego-opts]    In-memory round-trip smoke test.\n"
-        "  crypto-info               Print backend and available algorithms.\n"
-        "\n"
-        "Password options (encrypt / decrypt / embed / extract):\n"
-        "  --password <pw>           Inline password (visible in ps(1) — avoid).\n"
-        "  --password-stdin          Read password from stdin (recommended).\n"
-        "                            Trailing newline / CR is stripped.\n"
-        "                            Falls back to env RFP_PASSWORD if neither\n"
-        "                            --password nor --password-stdin is set.\n"
-        "\n"
-        "Encryption options:\n"
-        "  --cipher <name>           AES-128-GCM | AES-256-GCM |\n"
-        "                            ChaCha20-Poly1305 | AES-256-CBC |\n"
-        "                            AES-256-CTR   (default: AES-256-GCM).\n"
-        "  --kdf <name>              PBKDF2-HMAC-SHA256 (default) |\n"
-        "                            PBKDF2-HMAC-SHA512 | scrypt.\n"
-        "  --iterations <N>          KDF iterations (default: 100000).\n"
-        "\n"
-        "Steganography options:\n"
-        "  --bits <1-4>              Bits per channel (default: 1).\n"
-        "  --seed <N>                0 = sequential (default: 0).\n"
-        "  --channels <RGB[A]>       e.g. RGB (default) or RGBA.\n"
-        "  --mode uniform|smart      default: uniform.\n"
-        "  --window <3|5|7|9|11|13>  smart-mode window size (default: 5).\n"
-        "  --metric luminance|per-channel|sum\n"
-        "  --threshold <value>       smart-mode threshold.\n"
-        "  --shuffle on|off          default: off.\n"
-        "\n"
-        "Size header (optional 4-byte big-endian length prefix):\n"
-        "  --header on|off           Write (embed) / expect (extract) a header\n"
-        "                            with the exact payload length. Default: on.\n"
-        "                            --header on  + extract: size is auto-read.\n"
-        "                            --header off + extract: --payload-size N\n"
-        "                            is REQUIRED (N = length of the embedded\n"
-        "                            payload; for encrypted data, length of\n"
-        "                            the RFP1 blob).\n"
-        "  --payload-size <N>        Only used with --header off on extract.\n"
-        "\n"
-        "Image formats: PNG and binary PPM/PGM are supported natively.\n"
-        "Format is detected on load and chosen by extension on save.\n"
-        "\n"
-        "Examples:\n"
-        "  # Embed with header, encrypted:\n"
-        "  printf 'pw\\n' | rfp-cli embed cover.png stego.png \\\n"
-        "      --text 'hello' --password-stdin\n"
-        "  printf 'pw\\n' | rfp-cli extract stego.png --password-stdin\n"
-        "\n"
-        "  # Embed without header, encrypted, then extract with explicit size:\n"
-        "  printf 'pw\\n' | rfp-cli embed cover.png raw.png \\\n"
-        "      --text 'hello' --password-stdin --header off\n"
-        "  #   ... embed prints 'Embedded N bytes (encrypted) (no header)';\n"
-        "  #       use that N in --payload-size below.\n"
-        "  printf 'pw\\n' | rfp-cli extract raw.png \\\n"
-        "      --password-stdin --header off --payload-size N\n";
+                                                                   "\n"
+                                                                   "Usage:\n"
+                                                                   "  rfp-cli <command> [options]\n"
+                                                                   "\n"
+                                                                   "Commands:\n"
+                                                                   "  help | --help | -h        Show this help.\n"
+                                                                   "  --version | -v            Print version.\n"
+                                                                   "  crc <text>                CRC32 of text.\n"
+                                                                   "  hash <text> [--algo <name>]\n"
+                                                                   "                            Hash of text. SHA-256 (default) | SHA-512 |\n"
+                                                                   "                            SHA3-256 | SHA3-512 | BLAKE2b.\n"
+                                                                   "  encrypt <text> [pw-opts] [--cipher <n>] [--kdf <n>]\n"
+                                                                   "                 [--iterations <N>] [--hex]\n"
+                                                                   "                            Produce RFP1 payload (Base64 by default).\n"
+                                                                   "  decrypt <encoded> [pw-opts] [--hex]\n"
+                                                                   "                            Decrypt an RFP1 payload.\n"
+                                                                   "  embed <in.(png|ppm)> <out.(png|ppm)> --text <text> [pw-opts]\n"
+                                                                   "        [--header on|off] [stego-opts]\n"
+                                                                   "                            Embed text into image; encrypts if a\n"
+                                                                   "                            password is provided.\n"
+                                                                   "  extract <in.(png|ppm)> [pw-opts] [--header on|off]\n"
+                                                                   "        [--payload-size N] [stego-opts]\n"
+                                                                   "                            Extract text from image; decrypts if a\n"
+                                                                   "                            password is provided.\n"
+                                                                   "  self-test [stego-opts]    In-memory round-trip smoke test.\n"
+                                                                   "  crypto-info               Print backend and available algorithms.\n"
+                                                                   "\n"
+                                                                   "Password options (encrypt / decrypt / embed / extract):\n"
+                                                                   "  --password <pw>           Inline password (visible in ps(1) — avoid).\n"
+                                                                   "  --password-stdin          Read password from stdin (recommended).\n"
+                                                                   "                            Trailing newline / CR is stripped.\n"
+                                                                   "                            Falls back to env RFP_PASSWORD if neither\n"
+                                                                   "                            --password nor --password-stdin is set.\n"
+                                                                   "\n"
+                                                                   "Encryption options:\n"
+                                                                   "  --cipher <name>           AES-128-GCM | AES-256-GCM |\n"
+                                                                   "                            ChaCha20-Poly1305 | AES-256-CBC |\n"
+                                                                   "                            AES-256-CTR   (default: AES-256-GCM).\n"
+                                                                   "  --kdf <name>              PBKDF2-HMAC-SHA256 (default) |\n"
+                                                                   "                            PBKDF2-HMAC-SHA512 | scrypt.\n"
+                                                                   "  --iterations <N>          KDF iterations (default: 100000).\n"
+                                                                   "\n"
+                                                                   "Steganography options:\n"
+                                                                   "  --bits <1-4>              Bits per channel (default: 1).\n"
+                                                                   "  --seed <N>                0 = sequential (default: 0).\n"
+                                                                   "  --channels <RGB[A]>       e.g. RGB (default) or RGBA.\n"
+                                                                   "  --mode uniform|smart      default: uniform.\n"
+                                                                   "  --window <3|5|7|9|11|13>  smart-mode window size (default: 5).\n"
+                                                                   "  --metric luminance|per-channel|sum\n"
+                                                                   "  --threshold <value>       smart-mode threshold.\n"
+                                                                   "  --shuffle on|off          default: off.\n"
+                                                                   "\n"
+                                                                   "Size header (optional 4-byte big-endian length prefix):\n"
+                                                                   "  --header on|off           Write (embed) / expect (extract) a header\n"
+                                                                   "                            with the exact payload length. Default: on.\n"
+                                                                   "                            --header on  + extract: size is auto-read.\n"
+                                                                   "                            --header off + extract: --payload-size N\n"
+                                                                   "                            is REQUIRED (N = length of the embedded\n"
+                                                                   "                            payload; for encrypted data, length of\n"
+                                                                   "                            the RFP1 blob).\n"
+                                                                   "  --payload-size <N>        Only used with --header off on extract.\n"
+                                                                   "\n"
+                                                                   "Image formats: PNG and binary PPM/PGM are supported natively.\n"
+                                                                   "Format is detected on load and chosen by extension on save.\n"
+                                                                   "\n"
+                                                                   "Examples:\n"
+                                                                   "  # Embed with header, encrypted:\n"
+                                                                   "  printf 'pw\\n' | rfp-cli embed cover.png stego.png \\\n"
+                                                                   "      --text 'hello' --password-stdin\n"
+                                                                   "  printf 'pw\\n' | rfp-cli extract stego.png --password-stdin\n"
+                                                                   "\n"
+                                                                   "  # Embed without header, encrypted, then extract with explicit size:\n"
+                                                                   "  printf 'pw\\n' | rfp-cli embed cover.png raw.png \\\n"
+                                                                   "      --text 'hello' --password-stdin --header off\n"
+                                                                   "  #   ... embed prints 'Embedded N bytes (encrypted) (no header)';\n"
+                                                                   "  #       use that N in --payload-size below.\n"
+                                                                   "  printf 'pw\\n' | rfp-cli extract raw.png \\\n"
+                                                                   "      --password-stdin --header off --payload-size N\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +155,30 @@ Args parseArgs(int argc, char** argv, int start) {
 }
 
 // ---------------------------------------------------------------------------
+//  Environment variable reader
+// ---------------------------------------------------------------------------
+// MSVC with /W4 emits C4996 on std::getenv ("This function or variable may
+// be unsafe"). For reading a well-known environment variable this is a false
+// positive: the returned pointer is copied into a std::string immediately and
+// is never stored or dereferenced later, and this CLI never calls setenv() or
+// putenv(). We suppress the warning locally instead of disabling the whole
+// _CRT_SECURE_NO_WARNINGS class, which would hide genuine issues elsewhere.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4996)
+#endif
+
+std::optional<std::string> readEnv(const char* name) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || *value == '\0') return std::nullopt;
+    return std::string(value);
+}
+
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
+
+// ---------------------------------------------------------------------------
 //  Password resolution
 // ---------------------------------------------------------------------------
 /// Precedence: --password-stdin  >  --password  >  env RFP_PASSWORD.
@@ -166,8 +190,7 @@ std::optional<std::string> resolvePassword(const Args& args) {
         return pw;
     }
     if (auto p = args.get("password"); p && !p->empty()) return p;
-    if (const char* env = std::getenv("RFP_PASSWORD"); env && *env)
-        return std::string(env);
+    if (auto env = readEnv("RFP_PASSWORD"); env) return env;
     return std::nullopt;
 }
 
@@ -393,7 +416,7 @@ int cmdEmbed(int argc, char** argv) {
     const auto capacity = rfp::stego::capacityBytes(image, params);
     if (framed.size() > capacity) {
         std::cerr << "Payload too large: need " << framed.size()
-                  << " bytes, capacity is " << capacity << " bytes\n";
+        << " bytes, capacity is " << capacity << " bytes\n";
         return EXIT_FAILURE;
     }
 
@@ -459,14 +482,14 @@ int cmdExtract(int argc, char** argv) {
             (static_cast<std::uint32_t>(frame[0]) << 24) |
             (static_cast<std::uint32_t>(frame[1]) << 16) |
             (static_cast<std::uint32_t>(frame[2]) <<  8) |
-             static_cast<std::uint32_t>(frame[3]);
+            static_cast<std::uint32_t>(frame[3]);
         payloadStart = 4;
 
         if (payloadSize == 0 ||
             payloadStart + payloadSize > frame.size()) {
             std::cerr << "Invalid payload size in header: " << payloadSize
                       << " (capacity: " << frame.size() << " bytes). "
-                         "Did you forget --header off?\n";
+                                                           "Did you forget --header off?\n";
             return EXIT_FAILURE;
         }
     } else {
