@@ -1,14 +1,3 @@
-# Обновление документации
-
-Ниже — актуальные версии файлов. Я сохранил структуру и тон существующих доков, добавил то, что появилось: шифрование, `--password-stdin`, `--header on|off`, `--payload-size`, PNG в CLI, модуль `rfp::payload`.
-
----
-
-## 1. `README.md`
-
-Изменения: в features добавлены CLI file I/O, PNG, RFP1-payload; обновлены блоки Requirements, Quick start, Running, Tests.
-
-```markdown
 # R.F.P. — Resilient File Protector
 
 [![CI](https://github.com/OWNER/rfp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/rfp/actions/workflows/ci.yml)
