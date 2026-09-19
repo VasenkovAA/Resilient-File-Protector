@@ -1,6 +1,6 @@
 # R.F.P. — Resilient File Protector
 
-[![CI](https://github.com/VasenkovAA/rfp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/rfp/actions/workflows/ci.yml)
+[![CI](https://github.com/VasenkovAA/rfp/actions/workflows/ci.yml/badge.svg)](https://github.com/VasenkovAA/rfp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-see%20LICENSE-blue)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Qt 6](https://img.shields.io/badge/Qt-6.8%20LTS-green.svg)](https://www.qt.io/)
