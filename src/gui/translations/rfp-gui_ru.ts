@@ -56,8 +56,8 @@
         <translation>Введите текст для сокрытия...</translation>
     </message>
     <message>
-        <source>Usage: %1 bytes</source>
-        <translation>Использовано: %1 байт</translation>
+        <source>Usage: 0 bytes</source>
+        <translation>Использовано: 0 байт</translation>
     </message>
     <message>
         <source>Steganography parameters (Embed)</source>
@@ -172,12 +172,20 @@
         <translation>Параметры извлечения</translation>
     </message>
     <message>
-        <source>Auto-detect payload size (recommended)</source>
-        <translation>Автоопределение размера данных (рекомендуется)</translation>
+        <source>Header written at embed time (auto-detect payload size)</source>
+        <translation>Заголовок записан при встраивании (автоопределение размера)</translation>
+    </message>
+    <message>
+        <source>This reflects the 'Write payload size header' setting in Settings. Change it there.</source>
+        <translation>Отражает настройку «Записывать заголовок размера» в Настройках. Изменить можно там.</translation>
     </message>
     <message>
         <source>Payload size (bytes):</source>
         <translation>Размер данных (байт):</translation>
+    </message>
+    <message>
+        <source>Used only when the embed did NOT write a size header. Must exactly match the length of the embedded payload.</source>
+        <translation>Используется, только если при встраивании заголовок не записывался. Должно точно совпадать с длиной встроенной нагрузки.</translation>
     </message>
     <message>
         <source>Extracted text will appear here</source>
@@ -212,14 +220,6 @@
         <translation>Не удалось разобрать параметры из буфера обмена.</translation>
     </message>
     <message>
-        <source>Parameters copied to clipboard.</source>
-        <translation>Параметры скопированы в буфер обмена.</translation>
-    </message>
-    <message>
-        <source>Parameters pasted from clipboard.</source>
-        <translation>Параметры вставлены из буфера обмена.</translation>
-    </message>
-    <message>
         <source>Loading image...</source>
         <translation>Загрузка изображения...</translation>
     </message>
@@ -234,6 +234,18 @@
     <message>
         <source>Resolution: %1×%2, Channels: %3</source>
         <translation>Разрешение: %1×%2, Каналы: %3</translation>
+    </message>
+    <message>
+        <source>Computing threshold (Embed)...</source>
+        <translation>Вычисление порога (встраивание)...</translation>
+    </message>
+    <message>
+        <source>Computing threshold (Extract)...</source>
+        <translation>Вычисление порога (извлечение)...</translation>
+    </message>
+    <message>
+        <source>Auto threshold: %1</source>
+        <translation>Автопорог: %1</translation>
     </message>
     <message>
         <source>Embedding...</source>
@@ -252,104 +264,44 @@
         <translation>Сначала загрузите входное изображение.</translation>
     </message>
     <message>
-        <source>Payload too large. Capacity: %1 bytes (including header if enabled).</source>
-        <translation>Данные слишком велики. Ёмкость: %1 байт (включая заголовок, если включён).</translation>
+        <source>Payload too large. Need %1 bytes, capacity is %2 bytes.</source>
+        <translation>Данные слишком велики. Требуется %1 байт, ёмкость — %2 байт.</translation>
+    </message>
+    <message>
+        <source>Encryption is enabled but the password is empty.</source>
+        <translation>Шифрование включено, но пароль не введён.</translation>
+    </message>
+    <message>
+        <source>Passwords do not match.</source>
+        <translation>Пароли не совпадают.</translation>
+    </message>
+    <message>
+        <source>Encryption failed: %1</source>
+        <translation>Ошибка шифрования: %1</translation>
+    </message>
+    <message>
+        <source>Encryption failed</source>
+        <translation>Ошибка шифрования</translation>
     </message>
     <message>
         <source>Embedding failed</source>
         <translation>Ошибка встраивания</translation>
     </message>
     <message>
+        <source>Saving image...</source>
+        <translation>Сохранение изображения...</translation>
+    </message>
+    <message>
         <source>Save failed</source>
         <translation>Ошибка сохранения</translation>
     </message>
     <message>
-        <source>Embedded %1 bytes%2. Used %3% of capacity.</source>
-        <translation>Встроено %1 байт%2. Использовано %3% ёмкости.</translation>
-    </message>
-    <message>
-        <source> (header included)</source>
-        <translation> (включая заголовок)</translation>
-    </message>
-    <message>
-        <source>Embedded %1 bytes. CRC32: %2</source>
-        <translation>Встроено %1 байт. CRC32: %2</translation>
-    </message>
-    <message>
-        <source>Specify input image path.</source>
-        <translation>Укажите путь входного изображения.</translation>
-    </message>
-    <message>
-        <source>Extracting...</source>
-        <translation>Извлечение...</translation>
-    </message>
-    <message>
-        <source>Extraction failed</source>
-        <translation>Ошибка извлечения</translation>
-    </message>
-    <message>
-        <source>Extracted %1 bytes. CRC32: %2</source>
-        <translation>Извлечено %1 байт. CRC32: %2</translation>
-    </message>
-    <message>
-        <source>Extracted %1 bytes</source>
-        <translation>Извлечено %1 байт</translation>
-    </message>
-    <message>
-        <source>Usage: %1 bytes</source>
-        <translation>Использовано: %1 байт</translation>
-    </message>
-    <message>
-        <source>Usage: no image</source>
-        <translation>Использовано: нет изображения</translation>
-    </message>
-    <message>
-        <source>Usage: 0 bytes (capacity 0)</source>
-        <translation>Использовано: 0 байт (ёмкость 0)</translation>
-    </message>
-    <message>
-        <source>Usage: &lt;span style="color:%1;"&gt;%2 / %3 bytes (%4%)&lt;/span&gt;</source>
-        <translation>Использовано: %2 / %3 байт (%4%)</translation>
-    </message>
-    <message>
-        <source>Capacity: %1 bytes (%2 bits)</source>
-        <translation>Ёмкость: %1 байт (%2 бит)</translation>
-    </message>
-    <message>
-        <source> (using %1% of available)</source>
-        <translation> (используется %1% от доступной)</translation>
-    </message>
-    <message>
-        <source>Dispersion overlay available only in Smart mode</source>
-        <translation>Наложение дисперсии доступно только в режиме Smart</translation>
-    </message>
-    <message>
-        <source>Dispersion: min=%1, max=%2, mean=%3</source>
-        <translation>Дисперсия: мин=%1, макс=%2, сред=%3</translation>
-    </message>
-    <message>
-        <source>No modified image available. Embed data first.</source>
-        <translation>Нет модифицированного изображения. Сначала встройте данные.</translation>
-    </message>
-    <message>
-        <source>Changed pixels: %1 / %2 (%3%)</source>
-        <translation>Изменённых пикселей: %1 / %2 (%3%)</translation>
-    </message>
-    <message>
-        <source>Header written at embed time (auto-detect payload size)</source>
-        <translation>Заголовок записан при встраивании (автоопределение размера)</translation>
-    </message>
-    <message>
-        <source>This reflects the 'Write payload size header' setting in Settings. Change it there.</source>
-        <translation>Отражает настройку «Записывать заголовок размера» в Настройках. Изменить можно там.</translation>
-    </message>
-    <message>
-        <source>Used only when the embed did NOT write a size header. Must exactly match the length of the embedded payload.</source>
-        <translation>Используется, только если при встраивании заголовок не записывался. Должно точно совпадать с длиной встроенной нагрузки.</translation>
-    </message>
-    <message>
         <source>Embedded %1 bytes%2%3.</source>
         <translation>Встроено %1 байт%2%3.</translation>
+    </message>
+    <message>
+        <source>Embedded %1 bytes%2. CRC32: %3</source>
+        <translation>Встроено %1 байт%2. CRC32: %3</translation>
     </message>
     <message>
         <source> (encrypted)</source>
@@ -364,36 +316,96 @@
         <translation> (без заголовка)</translation>
     </message>
     <message>
-        <source> (decrypted)</source>
-        <translation> (расшифровано)</translation>
-    </message>
-    <message>
-        <source>Extracted %1 bytes%2. CRC32: %3</source>
-        <translation>Извлечено %1 байт%2. CRC32: %3</translation>
-    </message>
-    <message>
-        <source>Encryption is enabled but the password is empty.</source>
-        <translation>Шифрование включено, но пароль не введён.</translation>
-    </message>
-    <message>
-        <source>Passwords do not match.</source>
-        <translation>Пароли не совпадают.</translation>
+        <source>Specify input image path.</source>
+        <translation>Укажите путь входного изображения.</translation>
     </message>
     <message>
         <source>Decryption is enabled but the password is empty.</source>
         <translation>Расшифровка включена, но пароль не введён.</translation>
     </message>
     <message>
-        <source>Encryption failed: %1</source>
-        <translation>Ошибка шифрования: %1</translation>
+        <source>Extracting...</source>
+        <translation>Извлечение...</translation>
     </message>
     <message>
-        <source>Encryption failed</source>
-        <translation>Ошибка шифрования</translation>
+        <source>Extraction failed</source>
+        <translation>Ошибка извлечения</translation>
     </message>
     <message>
-        <source>Payload too large. Need %1 bytes, capacity is %2 bytes.</source>
-        <translation>Данные слишком велики. Требуется %1 байт, ёмкость — %2 байт.</translation>
+        <source>Extracted %1 bytes</source>
+        <translation>Извлечено %1 байт</translation>
+    </message>
+    <message>
+        <source>Extracted %1 bytes%2. CRC32: %3</source>
+        <translation>Извлечено %1 байт%2. CRC32: %3</translation>
+    </message>
+    <message>
+        <source> (decrypted)</source>
+        <translation> (расшифровано)</translation>
+    </message>
+    <message>
+        <source>Computing capacity and preview...</source>
+        <translation>Вычисление ёмкости и предпросмотра...</translation>
+    </message>
+    <message>
+        <source>Usage: no image</source>
+        <translation>Использовано: нет изображения</translation>
+    </message>
+    <message>
+        <source>Usage: 0 bytes (capacity 0)</source>
+        <translation>Использовано: 0 байт (ёмкость 0)</translation>
+    </message>
+    <message>
+        <source>Capacity: %1 bytes (%2 bits)</source>
+        <translation>Ёмкость: %1 байт (%2 бит)</translation>
+    </message>
+    <message>
+        <source> (using %1% of available)</source>
+        <translation> (используется %1% от доступной)</translation>
+    </message>
+    <message>
+        <source>Usage: &lt;span style="color:%1;"&gt;%2 / %3 bytes (%4%)&lt;/span&gt;%5</source>
+        <translation>Использовано: %2 / %3 байт (%4%)%5</translation>
+    </message>
+    <message>
+        <source>Dispersion: min=%1, max=%2, mean=%3</source>
+        <translation>Дисперсия: мин=%1, макс=%2, сред=%3</translation>
+    </message>
+    <message>
+        <source>No modified image available. Embed data first.</source>
+        <translation>Нет модифицированного изображения. Сначала встройте данные.</translation>
+    </message>
+    <message>
+        <source>Changed pixels: %1 / %2 (%3%)</source>
+        <translation>Изменённых пикселей: %1 / %2 (%3%)</translation>
+    </message>
+    <message>
+        <source>Image sizes differ</source>
+        <translation>Размеры изображений различаются</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation>Просмотр</translation>
+    </message>
+    <message>
+        <source>Fullscreen: press Esc to exit</source>
+        <translation>Полный экран: нажмите Esc для выхода</translation>
+    </message>
+    <message>
+        <source>Masking...</source>
+        <translation>Маскировка...</translation>
+    </message>
+    <message>
+        <source>Masking completed</source>
+        <translation>Маскировка завершена</translation>
+    </message>
+    <message>
+        <source>Directory does not exist: %1</source>
+        <translation>Каталог не существует: %1</translation>
+    </message>
+    <message>
+        <source>Masking completed. Files touched: %1</source>
+        <translation>Маскировка завершена. Затронуто файлов: %1</translation>
     </message>
 </context>
 <context>
@@ -407,8 +419,16 @@
         <translation>Расшифровка</translation>
     </message>
     <message>
-        <source>Password</source>
-        <translation>Пароль</translation>
+        <source>Enter password</source>
+        <translation>Введите пароль</translation>
+    </message>
+    <message>
+        <source>Enter password to decrypt</source>
+        <translation>Введите пароль для расшифровки</translation>
+    </message>
+    <message>
+        <source>Show / hide password</source>
+        <translation>Показать / скрыть пароль</translation>
     </message>
     <message>
         <source>Password:</source>
@@ -421,10 +441,6 @@
     <message>
         <source>Confirm:</source>
         <translation>Подтверждение:</translation>
-    </message>
-    <message>
-        <source>Show / hide password</source>
-        <translation>Показать / скрыть пароль</translation>
     </message>
     <message>
         <source>Cipher:</source>
@@ -470,8 +486,16 @@
         <translation>Язык:</translation>
     </message>
     <message>
+        <source>Language change requires an application restart.</source>
+        <translation>Смена языка требует перезапуска приложения.</translation>
+    </message>
+    <message>
         <source>Overlay opacity:</source>
         <translation>Прозрачность наложения:</translation>
+    </message>
+    <message>
+        <source>Opacity of the dispersion overlay in the preview.</source>
+        <translation>Прозрачность наложения дисперсии в предпросмотре.</translation>
     </message>
     <message>
         <source>Show preview</source>
@@ -501,12 +525,20 @@
         <source>Write payload size header (4 bytes)</source>
         <translation>Записывать заголовок размера (4 байта)</translation>
     </message>
+    <message>
+        <source>If enabled, embedding writes a 4-byte length prefix that lets extraction read the payload size automatically. The setting must match between embed and extract.</source>
+        <translation>Если включено, при встраивании записывается 4-байтный префикс длины, позволяющий извлечению автоматически прочитать размер нагрузки. Настройка должна совпадать при встраивании и извлечении.</translation>
+    </message>
 </context>
 <context>
     <name>MaskingDialog</name>
     <message>
         <source>Access Masking</source>
         <translation>Маскировка доступа</translation>
+    </message>
+    <message>
+        <source>Select a directory...</source>
+        <translation>Выберите каталог...</translation>
     </message>
     <message>
         <source>Directory:</source>
@@ -523,6 +555,10 @@
     <message>
         <source>e.g. png</source>
         <translation>например, png</translation>
+    </message>
+    <message>
+        <source>File extension without the leading dot. Leave empty to match all files.</source>
+        <translation>Расширение файла без ведущей точки. Оставьте пустым, чтобы выбрать все файлы.</translation>
     </message>
     <message>
         <source>Files to touch:</source>
@@ -545,16 +581,16 @@
         <translation>Выберите каталог</translation>
     </message>
     <message>
-        <source>Starting masking...</source>
-        <translation>Запуск маскировки...</translation>
-    </message>
-    <message>
         <source>Directory is empty.</source>
         <translation>Каталог пуст.</translation>
     </message>
     <message>
-        <source>Masking completed.</source>
-        <translation>Маскировка завершена.</translation>
+        <source>Directory does not exist: %1</source>
+        <translation>Каталог не существует: %1</translation>
+    </message>
+    <message>
+        <source>Starting masking...</source>
+        <translation>Запуск маскировки...</translation>
     </message>
 </context>
 <context>
@@ -590,6 +626,14 @@
     <message>
         <source>FAQ</source>
         <translation>ЧАВО</translation>
+    </message>
+    <message>
+        <source>Page not found</source>
+        <translation>Страница не найдена</translation>
+    </message>
+    <message>
+        <source>Documentation page '%1' is not bundled with this build.</source>
+        <translation>Страница документации «%1» отсутствует в этой сборке.</translation>
     </message>
 </context>
 </TS>

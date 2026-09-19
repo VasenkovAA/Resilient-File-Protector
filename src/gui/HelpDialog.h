@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QDialog>
-#include <QMap>
 #include <QString>
 #include <QTextBrowser>
 #include <QTreeWidget>
@@ -12,10 +11,7 @@ public:
   explicit HelpDialog(QWidget *parent = nullptr);
 
   void setLanguage(const QString &lang);
-  QString currentLanguage() const { return currentLang_; }
-
-protected:
-  void closeEvent(QCloseEvent *event) override;
+  [[nodiscard]] QString currentLanguage() const { return currentLang_; }
 
 private slots:
   void onItemClicked(QTreeWidgetItem *item, int column);
@@ -24,7 +20,7 @@ private:
   void buildToc();
   void loadPage(const QString &pageName);
 
-  QTreeWidget *tocWidget_;
-  QTextBrowser *textBrowser_;
-  QString currentLang_ = "en";
+  QTreeWidget *tocWidget_ = nullptr;
+  QTextBrowser *textBrowser_ = nullptr;
+  QString currentLang_ = QStringLiteral("en");
 };
